@@ -1,0 +1,121 @@
+import type React from "react"
+import type { Metadata } from "next"
+import { Geist, Geist_Mono } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
+import { Providers } from "@/components/providers"
+import { ErrorBoundary } from "@/components/error-boundary"
+import "./globals.css"
+
+const _geist = Geist({ subsets: ["latin"] })
+const _geistMono = Geist_Mono({ subsets: ["latin"] })
+
+export const metadata: Metadata = {
+  title: "BoxBattle - Strategic Gaming",
+  description:
+    "Experience the ultimate competitive Dots and Boxes game with real-time multiplayer and blockchain rewards",
+  generator: "v0.app",
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Aggressive error suppression for browser extension conflicts
+              (function() {
+                // Protect Object.defineProperty
+                const originalDefineProperty = Object.defineProperty;
+                Object.defineProperty = function(obj, prop, descriptor) {
+                  try {
+                    return originalDefineProperty(obj, prop, descriptor);
+                  } catch (e) {
+                    // Silently fail if extensions conflict
+                    return obj;
+                  }
+                };
+
+                // Suppress console errors
+                const originalError = console.error;
+                const originalWarn = console.warn;
+                console.error = function(...args) {
+                  const message = args.join(' ');
+                  if (
+                    message.includes('chrome-extension://') ||
+                    message.includes('chrome.runtime') ||
+                    message.includes('Extension ID') ||
+                    message.includes('ethereum') ||
+                    message.includes('Cannot set property') ||
+                    message.includes('Invalid property descriptor') ||
+                    message.includes('defineProperty')
+                  ) {
+                    return;
+                  }
+                  originalError.apply(console, args);
+                };
+                console.warn = function(...args) {
+                  const message = args.join(' ');
+                  if (
+                    message.includes('chrome-extension://') ||
+                    message.includes('ethereum')
+                  ) {
+                    return;
+                  }
+                  originalWarn.apply(console, args);
+                };
+
+                // Catch all errors
+                window.addEventListener('error', function(e) {
+                  const msg = e.message || '';
+                  if (
+                    msg.includes('chrome.runtime') ||
+                    msg.includes('chrome-extension://') ||
+                    msg.includes('Extension ID') ||
+                    msg.includes('ethereum') ||
+                    msg.includes('Cannot set property') ||
+                    msg.includes('Invalid property descriptor') ||
+                    msg.includes('defineProperty')
+                  ) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    return false;
+                  }
+                }, true);
+
+                // Suppress unhandled promise rejections
+                window.addEventListener('unhandledrejection', function(e) {
+                  const message = e.reason?.message || e.reason || '';
+                  const msgStr = typeof message === 'string' ? message : JSON.stringify(message);
+                  if (
+                    msgStr.includes('chrome.runtime') ||
+                    msgStr.includes('chrome-extension://') ||
+                    msgStr.includes('ethereum') ||
+                    msgStr.includes('Cannot set property') ||
+                    msgStr.includes('Invalid property descriptor')
+                  ) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    return false;
+                  }
+                });
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className={`font-sans antialiased`}>
+        <ErrorBoundary>
+          <Providers>
+            {children}
+          </Providers>
+        </ErrorBoundary>
+        <Analytics />
+      </body>
+    </html>
+  )
+}

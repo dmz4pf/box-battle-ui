@@ -1,0 +1,287 @@
+import { useReadContract, useWriteContract, useWatchContractEvent, useWaitForTransactionReceipt } from 'wagmi'
+import { GAME_CONTRACT_ABI } from '@/lib/contract-abi'
+import { GAME_CONTRACT_ADDRESS } from '@/lib/wagmi-config'
+import { parseEther, decodeEventLog } from 'viem'
+
+export { useWaitForTransactionReceipt }
+
+// Read game state
+export function useGameState(gameId: bigint | undefined) {
+  const result = useReadContract({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'getGame',
+    args: gameId !== undefined ? [gameId] : undefined,
+    query: {
+      enabled: gameId !== undefined,
+    },
+  })
+
+  // Convert array response to object
+  const gameStateArray = result.data as any
+
+  if (gameStateArray && Array.isArray(gameStateArray)) {
+    return {
+      ...result,
+      data: {
+        player1: gameStateArray[0],
+        player2: gameStateArray[1],
+        currentTurn: gameStateArray[2],
+        state: gameStateArray[3],
+        player1Score: Number(gameStateArray[4]),
+        player2Score: Number(gameStateArray[5]),
+        winner: gameStateArray[6],
+      },
+    }
+  }
+
+  return { ...result, data: undefined }
+}
+
+// Check if a line is drawn
+export function useIsLineDrawn(
+  gameId: bigint | undefined,
+  row: number,
+  col: number,
+  direction: number
+) {
+  return useReadContract({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'isLineDrawn',
+    args:
+      gameId !== undefined
+        ? [gameId, row as any, col as any, direction as any]
+        : undefined,
+    query: {
+      enabled: gameId !== undefined,
+    },
+  })
+}
+
+// Get entry fee
+export function useEntryFee() {
+  return useReadContract({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'ENTRY_FEE',
+  })
+}
+
+export function useContractGridSize() {
+  return useReadContract({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'GRID_SIZE',
+  })
+}
+
+// Get game counter
+export function useGameCounter() {
+  return useReadContract({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'getGameCounter',
+  })
+}
+
+// Write functions
+export function useCreateGame() {
+  const { data: entryFee, isLoading: isLoadingFee, error: feeError } = useEntryFee()
+  const { writeContract, data: hash, ...rest } = useWriteContract()
+
+  const createGame = () => {
+    console.log('[CreateGame] Button clicked')
+    console.log('[CreateGame] Entry fee:', entryFee)
+    console.log('[CreateGame] Loading fee:', isLoadingFee)
+    console.log('[CreateGame] Fee error:', feeError)
+    console.log('[CreateGame] Contract address:', GAME_CONTRACT_ADDRESS)
+
+    if (!entryFee) {
+      console.error('[CreateGame] Entry fee not loaded yet. Cannot create game.')
+      alert('⚠️ Entry fee not loaded. Please refresh the page.')
+      return
+    }
+
+    console.log('[CreateGame] Calling writeContract...')
+    try {
+      writeContract(
+        {
+          address: GAME_CONTRACT_ADDRESS,
+          abi: GAME_CONTRACT_ABI,
+          functionName: 'createGame',
+          value: entryFee,
+        },
+        {
+          onSuccess: (txHash) => {
+            console.log('[CreateGame] Transaction sent! Hash:', txHash)
+          },
+          onError: (error) => {
+            console.error('[CreateGame] Transaction error:', error)
+            alert(`❌ Transaction failed: ${error.message}`)
+          },
+        }
+      )
+    } catch (error) {
+      console.error('[CreateGame] writeContract threw error:', error)
+      alert(`❌ Error: ${error}`)
+    }
+  }
+
+  return {
+    createGame,
+    isLoadingFee,
+    feeError,
+    hash,
+    ...rest,
+  }
+}
+
+export function useJoinGame() {
+  const { data: entryFee } = useEntryFee()
+  const { writeContract, ...rest } = useWriteContract()
+
+  const joinGame = (gameId: bigint) => {
+    console.log('[JoinGame Hook] Called with gameId:', gameId)
+    console.log('[JoinGame Hook] Entry fee:', entryFee)
+
+    if (!entryFee) {
+      console.error('[JoinGame Hook] Entry fee not loaded!')
+      return
+    }
+
+    console.log('[JoinGame Hook] Sending transaction...')
+    writeContract(
+      {
+        address: GAME_CONTRACT_ADDRESS,
+        abi: GAME_CONTRACT_ABI,
+        functionName: 'joinGame',
+        args: [gameId],
+        value: entryFee,
+      },
+      {
+        onSuccess: (hash) => {
+          console.log('[JoinGame Hook] Transaction sent! Hash:', hash)
+        },
+        onError: (error) => {
+          console.error('[JoinGame Hook] Transaction error:', error)
+        },
+      }
+    )
+  }
+
+  return {
+    joinGame,
+    ...rest,
+  }
+}
+
+export function usePlaceLine() {
+  const { writeContract, ...rest } = useWriteContract()
+
+  const placeLine = (gameId: bigint, lineId: string) => {
+    console.log('[PlaceLine] Called with gameId:', gameId, 'lineId:', lineId)
+
+    // Convert lineId (e.g., "h-0-0-0-1" or "v-0-0-1-0") to contract parameters
+    const parts = lineId.split("-")
+    const direction = parts[0] // "h" or "v"
+    const row = parseInt(parts[1])
+    const col = parseInt(parts[2])
+
+    // direction: 0 = horizontal, 1 = vertical
+    const directionNum = direction === "h" ? 0 : 1
+
+    console.log('[PlaceLine] Converted params:', { row, col, direction: directionNum })
+    console.log('[PlaceLine] Contract address:', GAME_CONTRACT_ADDRESS)
+    console.log('[PlaceLine] Calling writeContract...')
+
+    try {
+      writeContract(
+        {
+          address: GAME_CONTRACT_ADDRESS,
+          abi: GAME_CONTRACT_ABI,
+          functionName: 'placeLine',
+          args: [gameId, row as any, col as any, directionNum as any],
+          gas: 500000n, // Explicitly set gas limit to avoid estimation timeout
+        },
+        {
+          onSuccess: (txHash) => {
+            console.log('[PlaceLine] ✅ Transaction sent! Hash:', txHash)
+          },
+          onError: (error) => {
+            console.error('[PlaceLine] ❌ Transaction error:', error)
+            alert(`❌ Failed to place line: ${error.message}`)
+          },
+        }
+      )
+    } catch (error) {
+      console.error('[PlaceLine] ❌ writeContract threw error:', error)
+      alert(`❌ Error placing line: ${error}`)
+    }
+  }
+
+  return {
+    placeLine,
+    ...rest,
+  }
+}
+
+// Event watchers
+export function useWatchLinePlaced(
+  onLinePlaced: (log: any) => void,
+  gameId?: bigint
+) {
+  useWatchContractEvent({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    eventName: 'LinePlaced',
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        if (!gameId || log.args.gameId === gameId) {
+          onLinePlaced(log.args)
+        }
+      })
+    },
+  })
+}
+
+export function useWatchGameCreated(onGameCreated: (log: any) => void) {
+  useWatchContractEvent({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    eventName: 'GameCreated',
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        onGameCreated(log.args)
+      })
+    },
+  })
+}
+
+export function useWatchGameStarted(onGameStarted: (log: any) => void) {
+  useWatchContractEvent({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    eventName: 'GameStarted',
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        onGameStarted(log.args)
+      })
+    },
+  })
+}
+
+export function useWatchGameEnded(onGameEnded: (log: any) => void, gameId?: bigint) {
+  useWatchContractEvent({
+    address: GAME_CONTRACT_ADDRESS,
+    abi: GAME_CONTRACT_ABI,
+    eventName: 'GameEnded',
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        if (!gameId || log.args.gameId === gameId) {
+          onGameEnded(log.args)
+        }
+      })
+    },
+  })
+}

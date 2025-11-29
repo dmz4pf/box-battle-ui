@@ -1,0 +1,770 @@
+"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
+import { motion } from "framer-motion"
+import { useAccount } from "wagmi"
+import Header from "@/components/header"
+import GameBoard from "@/components/game-board"
+import PlayerCard from "@/components/player-card"
+import WinnerOverlay from "@/components/winner-overlay"
+import MoveHistory from "@/components/move-history"
+import GameModeSelector from "@/components/game-mode-selector"
+import MultiplayerLobby from "@/components/multiplayer-lobby"
+import DifficultySelector from "@/components/difficulty-selector"
+import {
+  useGameState,
+  useCreateGame,
+  useJoinGame,
+  usePlaceLine,
+  useWatchLinePlaced,
+  useWatchGameCreated,
+  useWatchGameStarted,
+  useWatchGameEnded,
+} from "@/hooks/useGameContract"
+
+type GameMode = "ai" | "multiplayer" | null
+type GamePhase = "mode-select" | "difficulty-select" | "lobby" | "playing"
+
+export default function GamePage() {
+  const account = useAccount()
+  const { address, isConnected } = account || { address: undefined, isConnected: false }
+  const [gameMode, setGameMode] = useState<GameMode>(null)
+  const [gamePhase, setGamePhase] = useState<GamePhase>("mode-select")
+  const [gameId, setGameId] = useState<bigint | undefined>()
+  const [moveHistory, setMoveHistory] = useState<string[]>([])
+  const [drawnLines, setDrawnLines] = useState<Map<string, "player1" | "player2">>(new Map())
+  const [completedBoxes, setCompletedBoxes] = useState<Map<string, "player1" | "player2">>(new Map())
+  const [currentAIPlayer, setCurrentAIPlayer] = useState<"player1" | "player2">("player1")
+  const [player1ScoreAI, setPlayer1ScoreAI] = useState(0)
+  const [player2ScoreAI, setPlayer2ScoreAI] = useState(0)
+  const [aiWinner, setAIWinner] = useState<"player1" | "player2" | null>(null)
+  const [gridSize, setGridSize] = useState(5) // Grid size: 3, 4, 5, or 6
+  const [timer, setTimer] = useState(180)
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | null>(null)
+
+  // Ref to track latest drawnLines for AI moves
+  const drawnLinesRef = useRef(drawnLines)
+  // Ref to prevent multiple AI moves at once
+  const aiMoveInProgress = useRef(false)
+
+  // Update ref whenever drawnLines changes
+  useEffect(() => {
+    drawnLinesRef.current = drawnLines
+  }, [drawnLines])
+
+  // Contract hooks
+  const { data: gameState, refetch: refetchGame } = useGameState(gameId)
+  const { createGame, isSuccess: gameCreated, data: createTxData } = useCreateGame()
+  const { joinGame, isSuccess: gameJoined } = useJoinGame()
+  const { placeLine, isPending: isPlacingLine } = usePlaceLine()
+
+  // Watch for game events
+  useWatchGameCreated((log: any) => {
+    if (log.gameId && address?.toLowerCase() === log.player1?.toLowerCase()) {
+      setGameId(log.gameId)
+      // Stay in waiting state until second player joins
+    }
+  })
+
+  useWatchGameStarted((log: any) => {
+    if (log.gameId) {
+      setGameId(log.gameId)
+      setGamePhase("playing")
+    }
+    refetchGame()
+  })
+
+  useWatchLinePlaced(
+    (log: any) => {
+      const row = Number(log.row)
+      const col = Number(log.col)
+      const direction = Number(log.direction)
+      const boxesCompleted = Number(log.boxesCompleted || 0)
+
+      const move = `Row ${row}, Col ${col}, Dir ${direction === 0 ? "H" : "V"}`
+      setMoveHistory((prev) => [...prev, move])
+
+      // Add line to drawn lines map
+      const lineId = direction === 0
+        ? `h-${row}-${col}-${row}-${col + 1}`
+        : `v-${row}-${col}-${row + 1}-${col}`
+
+      const playerWhoMoved = log.player?.toLowerCase() === player1?.toLowerCase() ? "player1" : "player2"
+      const newLines = new Map(drawnLines)
+      newLines.set(lineId, playerWhoMoved)
+      setDrawnLines(newLines)
+
+      // If boxes were completed, detect which ones and mark them
+      if (boxesCompleted > 0) {
+        // Use our box detection logic to find newly completed boxes
+        const { newBoxes } = checkCompletedBoxes(newLines, playerWhoMoved)
+        setCompletedBoxes(newBoxes)
+      }
+
+      refetchGame()
+    },
+    gameId
+  )
+
+  useWatchGameEnded(
+    (log: any) => {
+      refetchGame()
+    },
+    gameId
+  )
+
+  // Extract game state
+  const player1 = gameState?.[0]
+  const player2 = gameState?.[1]
+  const currentTurn = gameState?.[2]
+  const gameStateEnum = gameState?.[3]
+  const player1Score = gameState?.[4] || 0
+  const player2Score = gameState?.[5] || 0
+  const winner = gameState?.[6]
+
+  const isPlayer1 = address?.toLowerCase() === player1?.toLowerCase()
+  const isPlayer2 = address?.toLowerCase() === player2?.toLowerCase()
+  const isMyTurn = address?.toLowerCase() === currentTurn?.toLowerCase()
+  const isGameActive = gameStateEnum === 1 // 1 = Active state
+
+  // Box completion detection function
+  const checkCompletedBoxes = useCallback((lines: Map<string, "player1" | "player2">, player: "player1" | "player2"): { newBoxes: Map<string, "player1" | "player2">, boxesCompleted: number } => {
+    const newCompletedBoxes = new Map(completedBoxes)
+    let boxesCompletedCount = 0
+
+    // Check each potential box (grid is gridSize x gridSize dots, so (gridSize-1) x (gridSize-1) boxes)
+    for (let row = 0; row < gridSize - 1; row++) {
+      for (let col = 0; col < gridSize - 1; col++) {
+        const boxId = `box-${row}-${col}`
+
+        // Skip if box already completed
+        if (newCompletedBoxes.has(boxId)) continue
+
+        // Check if all 4 sides of the box are drawn
+        const topLine = `h-${row}-${col}-${row}-${col + 1}`
+        const bottomLine = `h-${row + 1}-${col}-${row + 1}-${col + 1}`
+        const leftLine = `v-${row}-${col}-${row + 1}-${col}`
+        const rightLine = `v-${row}-${col + 1}-${row + 1}-${col + 1}`
+
+        if (lines.has(topLine) && lines.has(bottomLine) && lines.has(leftLine) && lines.has(rightLine)) {
+          newCompletedBoxes.set(boxId, player)
+          boxesCompletedCount++
+        }
+      }
+    }
+
+    return { newBoxes: newCompletedBoxes, boxesCompleted: boxesCompletedCount }
+  }, [completedBoxes, gridSize])
+
+  // Sync completed boxes count with contract scores when game state changes
+  useEffect(() => {
+    if (gameMode === "multiplayer" && gameState && (player1Score > 0 || player2Score > 0)) {
+      // The contract tracks scores but not which specific boxes belong to whom
+      // We reconstruct this from the lines that have been drawn
+      // This runs when game state updates to ensure UI stays in sync
+      const { newBoxes } = checkCompletedBoxes(drawnLines, "player1")
+      if (newBoxes.size > 0) {
+        setCompletedBoxes(newBoxes)
+      }
+    }
+  }, [player1Score, player2Score, gameMode, gameState, drawnLines, checkCompletedBoxes])
+
+  // Timer countdown
+  useEffect(() => {
+    if (!isGameActive) return
+
+    const interval = setInterval(() => {
+      setTimer((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isGameActive])
+
+  // Trigger AI move when it's AI's turn
+  useEffect(() => {
+    console.log("🤖 AI useEffect triggered:", { gameMode, currentAIPlayer, aiWinner, drawnLinesCount: drawnLines.size, aiMoveInProgress: aiMoveInProgress.current })
+
+    if (gameMode !== "ai" || currentAIPlayer !== "player2" || aiWinner || aiMoveInProgress.current) {
+      console.log("⚠️ AI move blocked:", {
+        isAIMode: gameMode === "ai",
+        isPlayer2Turn: currentAIPlayer === "player2",
+        gameEnded: !!aiWinner,
+        moveInProgress: aiMoveInProgress.current
+      })
+      return
+    }
+
+    console.log("✅ AI move starting in 800ms...")
+    aiMoveInProgress.current = true
+    const timer = setTimeout(() => {
+      console.log("🎮 AI move executing now!")
+
+      // Use the ref to get the latest drawnLines
+      const currentDrawnLines = drawnLinesRef.current
+      console.log("📝 Current drawn lines count:", currentDrawnLines.size)
+
+      const allLines: string[] = []
+
+      // Generate all possible lines based on current grid size
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize - 1; col++) {
+          allLines.push(`h-${row}-${col}-${row}-${col + 1}`)
+        }
+      }
+      for (let row = 0; row < gridSize - 1; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          allLines.push(`v-${row}-${col}-${row + 1}-${col}`)
+        }
+      }
+
+      // Filter out drawn lines
+      const availableLines = allLines.filter(line => !currentDrawnLines.has(line))
+      console.log(`📊 Available lines: ${availableLines.length} out of ${allLines.length}`)
+
+      if (availableLines.length === 0) {
+        console.log("❌ No available lines, AI cannot move")
+        return
+      }
+
+      // Helper function to check if a line would complete a box
+      const wouldCompleteBox = (lineId: string, lines: Map<string, "player1" | "player2">): boolean => {
+        const testLines = new Map(lines)
+        testLines.set(lineId, "player2")
+        const parts = lineId.split("-")
+        const type = parts[0]
+        const row = parseInt(parts[1])
+        const col = parseInt(parts[2])
+
+        // Check boxes that could be affected by this line
+        const boxesToCheck: Array<{ row: number, col: number }> = []
+
+        if (type === "h") {
+          // Horizontal line can complete box above and below
+          if (row > 0) boxesToCheck.push({ row: row - 1, col })
+          if (row < gridSize - 1) boxesToCheck.push({ row, col })
+        } else {
+          // Vertical line can complete box to left and right
+          if (col > 0) boxesToCheck.push({ row, col: col - 1 })
+          if (col < gridSize - 1) boxesToCheck.push({ row, col })
+        }
+
+        for (const box of boxesToCheck) {
+          const topLine = `h-${box.row}-${box.col}-${box.row}-${box.col + 1}`
+          const bottomLine = `h-${box.row + 1}-${box.col}-${box.row + 1}-${box.col + 1}`
+          const leftLine = `v-${box.row}-${box.col}-${box.row + 1}-${box.col}`
+          const rightLine = `v-${box.row}-${box.col + 1}-${box.row + 1}-${box.col + 1}`
+
+          if (testLines.has(topLine) && testLines.has(bottomLine) && testLines.has(leftLine) && testLines.has(rightLine)) {
+            return true
+          }
+        }
+
+        return false
+      }
+
+      // Strategy varies by difficulty:
+      const completingMoves = availableLines.filter(line => wouldCompleteBox(line, currentDrawnLines))
+      const safeMoves = availableLines.filter(line => !wouldCompleteBox(line, currentDrawnLines))
+      console.log(`🧠 AI Strategy: ${completingMoves.length} completing moves, ${safeMoves.length} safe moves`)
+
+      let selectedLine: string
+
+      // Default to medium if difficulty not set
+      const currentDifficulty = difficulty || "medium"
+      console.log(`🎯 Difficulty: ${currentDifficulty}`)
+
+      if (currentDifficulty === "easy") {
+        // Easy: 40% chance to make a random move, 60% to use basic strategy
+        if (Math.random() < 0.4) {
+          selectedLine = availableLines[Math.floor(Math.random() * availableLines.length)]
+        } else {
+          // Basic strategy: complete boxes if available, otherwise random
+          if (completingMoves.length > 0 && Math.random() < 0.7) {
+            selectedLine = completingMoves[0]
+          } else {
+            selectedLine = availableLines[Math.floor(Math.random() * availableLines.length)]
+          }
+        }
+      } else if (currentDifficulty === "medium") {
+        // Medium: Standard strategy - complete boxes, avoid setup, random safe
+        if (completingMoves.length > 0) {
+          selectedLine = completingMoves[0]
+        } else if (safeMoves.length > 0) {
+          selectedLine = safeMoves[Math.floor(Math.random() * safeMoves.length)]
+        } else {
+          selectedLine = availableLines[Math.floor(Math.random() * availableLines.length)]
+        }
+      } else {
+        // Hard: Advanced strategy - always complete boxes, avoid setup moves intelligently
+        if (completingMoves.length > 0) {
+          // Always take completing moves
+          selectedLine = completingMoves[0]
+        } else if (safeMoves.length > 0) {
+          // Pick the safest move (one that creates fewest opportunities for opponent)
+          selectedLine = safeMoves[Math.floor(Math.random() * safeMoves.length)]
+        } else {
+          // If forced to give up a box, give up the smallest chain
+          selectedLine = availableLines[Math.floor(Math.random() * availableLines.length)]
+        }
+      }
+
+      console.log(`🎲 AI selected line: ${selectedLine}`)
+
+      const newLines = new Map(currentDrawnLines)
+      newLines.set(selectedLine, "player2")
+      setDrawnLines(newLines)
+
+      const parts = selectedLine.split("-")
+      const move = `AI: Row ${parts[1]}, Col ${parts[2]}, ${parts[0] === "h" ? "H" : "V"}`
+      setMoveHistory(prev => [...prev, move])
+
+      // Check if AI completed boxes
+      const { newBoxes, boxesCompleted } = checkCompletedBoxes(newLines, "player2")
+      console.log(`📦 AI completed ${boxesCompleted} boxes`)
+
+      if (boxesCompleted > 0) {
+        setCompletedBoxes(newBoxes)
+        setPlayer2ScoreAI(prev => prev + boxesCompleted)
+        console.log("🎁 AI gets bonus turn!")
+        // Bonus turn! Keep currentAIPlayer as player2
+        // Reset the flag so another AI move can happen
+        aiMoveInProgress.current = false
+      } else {
+        console.log("🔄 Switching turn back to player1")
+        // Switch back to player
+        aiMoveInProgress.current = false
+        setCurrentAIPlayer("player1")
+      }
+
+      // Check for game end
+      const totalBoxes = (gridSize - 1) * (gridSize - 1)
+      if (newBoxes.size === totalBoxes) {
+        const p1Score = Array.from(newBoxes.values()).filter(p => p === "player1").length
+        const p2Score = Array.from(newBoxes.values()).filter(p => p === "player2").length
+        setPlayer1ScoreAI(p1Score)
+        setPlayer2ScoreAI(p2Score)
+        setAIWinner(p1Score > p2Score ? "player1" : "player2")
+        aiMoveInProgress.current = false
+      }
+    }, 800)
+
+    return () => {
+      clearTimeout(timer)
+      aiMoveInProgress.current = false
+    }
+  }, [gameMode, currentAIPlayer, aiWinner, gridSize, difficulty])
+
+  // Handle line click
+  const handleLineClick = (lineId: string) => {
+    if (gameMode === "ai") {
+      // AI mode - local game logic
+      console.log(`👤 Player clicked line: ${lineId}`, { currentAIPlayer, isDrawn: drawnLines.has(lineId) })
+
+      if (drawnLines.has(lineId) || currentAIPlayer !== "player1") {
+        console.log("⚠️ Player move blocked:", {
+          alreadyDrawn: drawnLines.has(lineId),
+          notPlayerTurn: currentAIPlayer !== "player1"
+        })
+        return
+      }
+
+      console.log("✅ Player move accepted!")
+      const newLines = new Map(drawnLines)
+      newLines.set(lineId, "player1")
+      setDrawnLines(newLines)
+
+      const parts = lineId.split("-")
+      const move = `You: Row ${parts[1]}, Col ${parts[2]}, ${parts[0] === "h" ? "H" : "V"}`
+      setMoveHistory(prev => [...prev, move])
+
+      // Check if player completed boxes
+      const { newBoxes, boxesCompleted } = checkCompletedBoxes(newLines, "player1")
+      console.log(`📦 Player completed ${boxesCompleted} boxes`)
+
+      if (boxesCompleted > 0) {
+        setCompletedBoxes(newBoxes)
+        setPlayer1ScoreAI(prev => prev + boxesCompleted)
+        console.log("🎁 Player gets bonus turn!")
+
+        // Check for game end
+        const totalBoxes = (gridSize - 1) * (gridSize - 1)
+        if (newBoxes.size === totalBoxes) {
+          const p1Score = Array.from(newBoxes.values()).filter(p => p === "player1").length
+          const p2Score = Array.from(newBoxes.values()).filter(p => p === "player2").length
+          setPlayer1ScoreAI(p1Score)
+          setPlayer2ScoreAI(p2Score)
+          setAIWinner(p1Score > p2Score ? "player1" : "player2")
+          return
+        }
+
+        // Player gets bonus turn! Stay as player1
+        // Don't trigger AI move
+      } else {
+        // Check for game end before switching
+        const totalBoxes = (gridSize - 1) * (gridSize - 1)
+        if (newBoxes.size === totalBoxes) {
+          const p1Score = Array.from(newBoxes.values()).filter(p => p === "player1").length
+          const p2Score = Array.from(newBoxes.values()).filter(p => p === "player2").length
+          setPlayer1ScoreAI(p1Score)
+          setPlayer2ScoreAI(p2Score)
+          setAIWinner(p1Score > p2Score ? "player1" : "player2")
+          return
+        }
+
+        // No box completed, switch to AI (useEffect will trigger AI move)
+        console.log("🔄 Switching turn to AI (player2)")
+        setCurrentAIPlayer("player2")
+      }
+
+      return
+    }
+
+    // Multiplayer mode - blockchain logic
+    if (!gameId || !isMyTurn || !isGameActive || isPlacingLine) return
+
+    // Parse lineId to get row, col, direction
+    // Format: "h-row-col1-row-col2" or "v-row1-col-row2-col"
+    const parts = lineId.split("-")
+    const type = parts[0] // 'h' or 'v'
+    const row = parseInt(parts[1])
+    const col = parseInt(parts[2])
+    const direction = type === "h" ? 0 : 1 // 0 = horizontal, 1 = vertical
+
+    placeLine(gameId, row, col, direction)
+  }
+
+  // Mode selection handlers
+  const handleSelectMode = (mode: "ai" | "multiplayer") => {
+    setGameMode(mode)
+    if (mode === "ai") {
+      // For AI mode, show difficulty selector first
+      setGamePhase("difficulty-select")
+    } else {
+      // For multiplayer, show lobby
+      setGamePhase("lobby")
+    }
+  }
+
+  // Difficulty selection handler
+  const handleSelectDifficulty = (diff: "easy" | "medium" | "hard") => {
+    aiMoveInProgress.current = false
+    setDifficulty(diff)
+    setGamePhase("playing")
+  }
+
+  // Handle create game
+  const handleCreateGame = () => {
+    createGame()
+  }
+
+  // Handle join game
+  const handleJoinGame = (opponentAddress: string) => {
+    if (!gameId) {
+      const inputGameId = prompt("Enter Game ID to join:")
+      if (inputGameId) {
+        const gId = BigInt(inputGameId)
+        setGameId(gId)
+        joinGame(gId)
+      }
+    }
+  }
+
+  // Watch for successful game creation to transition to playing phase
+  useEffect(() => {
+    if (gameCreated && gameId && gameMode === "multiplayer") {
+      setGamePhase("playing")
+    }
+  }, [gameCreated, gameId, gameMode])
+
+  // Handle reset
+  const handleReset = () => {
+    aiMoveInProgress.current = false
+    setGameId(undefined)
+    setMoveHistory([])
+    setDrawnLines(new Map())
+    setCompletedBoxes(new Map())
+    setCurrentAIPlayer("player1")
+    setPlayer1ScoreAI(0)
+    setPlayer2ScoreAI(0)
+    setAIWinner(null)
+    setTimer(180)
+    setGamePhase("mode-select")
+    setGameMode(null)
+    setDifficulty(null)
+  }
+
+  // Show connection prompt if not connected AND trying to play multiplayer
+  if (!isConnected && gameMode === "multiplayer") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+        <Header timer={timer} />
+        <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl w-full"
+          >
+            {/* Title Section */}
+            <div className="text-center mb-12">
+              <motion.h1
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="text-5xl md:text-6xl font-black mb-4 bg-gradient-to-r from-cyan-300 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+              >
+                Welcome to BoxBattle!
+              </motion.h1>
+              <p className="text-xl text-slate-300 mb-2">The Ultimate Web3 Strategy Game</p>
+              <p className="text-purple-400">Connect your wallet to start playing</p>
+            </div>
+
+            {/* Feature Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-xl p-6 text-center"
+              >
+                <div className="text-4xl mb-3">🤖</div>
+                <h3 className="font-bold text-white mb-2">Play vs AI</h3>
+                <p className="text-sm text-slate-400">Practice and improve your skills</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-6 text-center"
+              >
+                <div className="text-4xl mb-3">⛓️</div>
+                <h3 className="font-bold text-white mb-2">On-Chain Battles</h3>
+                <p className="text-sm text-slate-400">Compete for real rewards</p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-6 text-center"
+              >
+                <div className="text-4xl mb-3">💎</div>
+                <h3 className="font-bold text-white mb-2">Win Prizes</h3>
+                <p className="text-sm text-slate-400">Earn cryptocurrency rewards</p>
+              </motion.div>
+            </div>
+
+            {/* Call to Action */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+              className="bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border-2 border-purple-500/50 rounded-2xl p-8 text-center"
+            >
+              <p className="text-lg text-white mb-6">
+                Click the <span className="text-purple-400 font-bold">"Connect Wallet"</span> button in the top right to get started
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  Secured by blockchain
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+                  Real-time gameplay
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                  Instant rewards
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Supported Wallets */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-8 text-center"
+            >
+              <p className="text-sm text-slate-500 mb-3">Supported Wallets</p>
+              <div className="flex justify-center gap-4 flex-wrap">
+                {["MetaMask", "Rabby", "Zerion", "Coinbase", "WalletConnect"].map((wallet) => (
+                  <span key={wallet} className="px-3 py-1 bg-slate-800/50 border border-slate-700 rounded-full text-xs text-slate-400">
+                    {wallet}
+                  </span>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show mode selector
+  if (gamePhase === "mode-select") {
+    return <GameModeSelector onSelectMode={handleSelectMode} gridSize={gridSize} onGridSizeChange={setGridSize} />
+  }
+
+  // Show difficulty selector for AI mode
+  if (gamePhase === "difficulty-select" && gameMode === "ai") {
+    return <DifficultySelector onSelectDifficulty={handleSelectDifficulty} onBack={() => setGamePhase("mode-select")} />
+  }
+
+  // Show multiplayer lobby
+  if (gamePhase === "lobby" && gameMode === "multiplayer") {
+    return (
+      <MultiplayerLobby
+        onJoinGame={handleJoinGame}
+        onCreateGame={handleCreateGame}
+        onBack={() => setGamePhase("mode-select")}
+        playerAddress={address || ""}
+      />
+    )
+  }
+
+  // For multiplayer: wait for game to be ready
+  if (gameMode === "multiplayer" && (!gameId || gameStateEnum === undefined)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+        <Header timer={timer} />
+        <div className="flex h-[calc(100vh-120px)] items-center justify-center">
+          <div className="text-center space-y-6">
+            {gameId && gameStateEnum === 0 && (
+              <div className="p-8 bg-slate-800/50 rounded-lg border-2 border-purple-500">
+                <p className="text-white font-bold mb-2 text-2xl">Game Created! 🎉</p>
+                <p className="text-slate-300 mb-2">Game ID: {gameId.toString()}</p>
+                <p className="text-slate-400 text-sm">Waiting for another player to join...</p>
+                <div className="mt-4 flex justify-center">
+                  <div className="w-12 h-12 border-4 border-purple-400 border-t-cyan-400 rounded-full animate-spin" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render game interface (both AI and multiplayer)
+  if (gamePhase === "playing") {
+    if (gameMode === "ai") {
+      // AI mode - local game
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+          <Header timer={timer} />
+
+          <div className="flex h-[calc(100vh-120px)] gap-4 p-6">
+            {/* Left Player Card */}
+            <div className="w-1/4">
+              <PlayerCard
+                playerNum={1}
+                score={player1ScoreAI}
+                isActive={currentAIPlayer === "player1"}
+                address="You"
+              />
+            </div>
+
+            {/* Center Game Area */}
+            <div className="flex-1 flex flex-col items-center justify-center gap-6">
+              <GameBoard
+                currentPlayer={currentAIPlayer}
+                onLineClick={handleLineClick}
+                drawnLines={drawnLines}
+                completedBoxes={completedBoxes}
+                gridSize={gridSize}
+              />
+              <div className="text-center">
+                <p className="text-sm text-cyan-300 mb-2 font-bold animate-pulse">
+                  {currentAIPlayer === "player1" ? "🟢 YOUR TURN!" : "🤖 AI IS THINKING..."}
+                </p>
+                <MoveHistory moves={moveHistory} />
+              </div>
+            </div>
+
+            {/* Right Player Card */}
+            <div className="w-1/4">
+              <PlayerCard
+                playerNum={2}
+                score={player2ScoreAI}
+                isActive={currentAIPlayer === "player2"}
+                address="AI"
+              />
+            </div>
+          </div>
+
+          {/* Winner Overlay for AI mode */}
+          {aiWinner && (
+            <WinnerOverlay
+              winner={aiWinner}
+              scores={{ player1: player1ScoreAI, player2: player2ScoreAI }}
+              onPlayAgain={handleReset}
+            />
+          )}
+        </div>
+      )
+    }
+
+    // Multiplayer mode - blockchain game
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+        <Header timer={timer} />
+
+        <div className="flex h-[calc(100vh-120px)] gap-4 p-6">
+          {/* Left Player Card */}
+          <div className="w-1/4">
+            <PlayerCard
+              playerNum={1}
+              score={player1Score}
+              isActive={currentTurn?.toLowerCase() === player1?.toLowerCase()}
+              address={player1 ? `${player1.slice(0, 6)}...${player1.slice(-4)}` : "0x0000...0000"}
+            />
+          </div>
+
+          {/* Center Game Area */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-6">
+            {isGameActive && (
+              <>
+                <GameBoard
+                  currentPlayer={isPlayer1 ? "player1" : "player2"}
+                  onLineClick={handleLineClick}
+                  gameId={gameId}
+                  drawnLines={drawnLines}
+                  completedBoxes={completedBoxes}
+                  gridSize={gridSize}
+                />
+                <div className="text-center">
+                  <p className="text-sm text-cyan-300 mb-2 font-bold animate-pulse">
+                    {isMyTurn ? "🟢 YOUR TURN!" : "⏳ WAITING FOR OPPONENT..."}
+                  </p>
+                  <MoveHistory moves={moveHistory} />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Right Player Card */}
+          <div className="w-1/4">
+            <PlayerCard
+              playerNum={2}
+              score={player2Score}
+              isActive={currentTurn?.toLowerCase() === player2?.toLowerCase()}
+              address={player2 ? `${player2.slice(0, 6)}...${player2.slice(-4)}` : "0x0000...0000"}
+            />
+          </div>
+        </div>
+
+        {/* Winner Overlay */}
+        {winner && winner !== "0x0000000000000000000000000000000000000000" && (
+          <WinnerOverlay
+            winner={winner.toLowerCase() === player1?.toLowerCase() ? "player1" : "player2"}
+            scores={{ player1: player1Score, player2: player2Score }}
+            onPlayAgain={handleReset}
+          />
+        )}
+      </div>
+    )
+  }
+
+  return null
+}

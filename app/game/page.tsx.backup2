@@ -1,0 +1,451 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { motion } from "framer-motion"
+import { useAccount } from "wagmi"
+import Header from "@/components/header"
+import GameBoard from "@/components/game-board"
+import PlayerCard from "@/components/player-card"
+import WinnerOverlay from "@/components/winner-overlay"
+import MoveHistory from "@/components/move-history"
+import GameModeSelector from "@/components/game-mode-selector"
+import MultiplayerLobby from "@/components/multiplayer-lobby"
+import DifficultySelector from "@/components/difficulty-selector"
+import { AIPlayer, type Difficulty } from "@/utils/ai-player"
+import {
+  useGameState,
+  useCreateGame,
+  useJoinGame,
+  usePlaceLine,
+  useWatchLinePlaced,
+  useWatchGameCreated,
+  useWatchGameStarted,
+  useWatchGameEnded,
+} from "@/hooks/useGameContract"
+
+type GameMode = "ai" | "multiplayer" | null
+type GamePhase = "mode-select" | "difficulty-select" | "lobby" | "playing"
+
+const GRID_SIZE = 5
+
+export default function GamePage() {
+  const account = useAccount()
+  const { address, isConnected } = account || { address: undefined, isConnected: false }
+
+  // Game state
+  const [gameMode, setGameMode] = useState<GameMode>(null)
+  const [gamePhase, setGamePhase] = useState<GamePhase>("mode-select")
+  const [currentPlayer, setCurrentPlayer] = useState<"player1" | "player2">("player1")
+  const [scores, setScores] = useState({ player1: 0, player2: 0 })
+  const [winner, setWinner] = useState<"player1" | "player2" | null>(null)
+  const [moveHistory, setMoveHistory] = useState<string[]>([])
+  const [timer, setTimer] = useState(180)
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium")
+  const [aiPlayer, setAiPlayer] = useState<AIPlayer | null>(null)
+  const [drawnLines, setDrawnLines] = useState<Set<string>>(new Set())
+  const [completedBoxes, setCompletedBoxes] = useState<Map<string, "player1" | "player2">>(new Map())
+  const [isProcessingMove, setIsProcessingMove] = useState(false)
+  const [totalBoxes] = useState((GRID_SIZE - 1) * (GRID_SIZE - 1))
+  const [aiNeedsAnotherTurn, setAiNeedsAnotherTurn] = useState(false)
+
+  // Multiplayer blockchain state
+  const [gameId, setGameId] = useState<bigint | undefined>()
+  const { data: gameState, refetch: refetchGame } = useGameState(gameId)
+  const { createGame, isSuccess: gameCreated, data: createTxData } = useCreateGame()
+  const { joinGame, isSuccess: gameJoined } = useJoinGame()
+  const { placeLine, isPending: isPlacingLine } = usePlaceLine()
+
+  // Watch blockchain events
+  useWatchGameCreated((event) => {
+    if (event.creator.toLowerCase() === address?.toLowerCase()) {
+      setGameId(event.gameId)
+    }
+  })
+
+  useWatchGameStarted((event) => {
+    if (event.gameId === gameId) {
+      refetchGame()
+    }
+  })
+
+  useWatchLinePlaced((event) => {
+    if (event.gameId === gameId) {
+      refetchGame()
+    }
+  })
+
+  useWatchGameEnded((event) => {
+    if (event.gameId === gameId) {
+      refetchGame()
+      setWinner(event.winner.toLowerCase() === gameState?.player1.toLowerCase() ? "player1" : "player2")
+      setGamePhase("playing")
+    }
+  })
+
+  // Box completion check
+  const isBoxComplete = useCallback((boxRow: number, boxCol: number, testLines: Set<string>): boolean => {
+    const top = `h-${boxRow}-${boxCol}-${boxRow}-${boxCol + 1}`
+    const bottom = `h-${boxRow + 1}-${boxCol}-${boxRow + 1}-${boxCol + 1}`
+    const left = `v-${boxRow}-${boxCol}-${boxRow + 1}-${boxCol}`
+    const right = `v-${boxRow}-${boxCol + 1}-${boxRow + 1}-${boxCol + 1}`
+
+    return testLines.has(top) && testLines.has(bottom) && testLines.has(left) && testLines.has(right)
+  }, [])
+
+  const checkBoxCompletion = useCallback(
+    (lineId: string, testLines: Set<string>): { newBoxes: Map<string, "player1" | "player2">; count: number } => {
+      const newBoxes = new Map(completedBoxes)
+      let completedCount = 0
+
+      // Check all boxes that could be affected by this line
+      for (let row = 0; row < GRID_SIZE - 1; row++) {
+        for (let col = 0; col < GRID_SIZE - 1; col++) {
+          const boxId = `box-${row}-${col}`
+
+          // Skip if already completed
+          if (newBoxes.has(boxId)) continue
+
+          if (isBoxComplete(row, col, testLines)) {
+            newBoxes.set(boxId, currentPlayer)
+            completedCount++
+          }
+        }
+      }
+
+      return { newBoxes, count: completedCount }
+    },
+    [completedBoxes, currentPlayer, isBoxComplete],
+  )
+
+  // AI Move logic
+  const makeAIMove = useCallback(() => {
+    console.log("[AI] makeAIMove called")
+    setIsProcessingMove(true)
+
+    if (!aiPlayer) {
+      console.log("[AI] AI player not initialized")
+      setIsProcessingMove(false)
+      return
+    }
+
+    const aiMove = aiPlayer.makeMove(drawnLines, GRID_SIZE - 1)
+    console.log("[AI] AI move selected:", aiMove.lineId)
+
+    if (!aiMove.lineId) {
+      console.log("[AI] No valid AI move found")
+      setIsProcessingMove(false)
+      return
+    }
+
+    // Add the line
+    const newDrawnLines = new Set(drawnLines)
+    newDrawnLines.add(aiMove.lineId)
+
+    // Check for completed boxes
+    const { newBoxes, count: boxesCompleted } = checkBoxCompletion(aiMove.lineId, newDrawnLines)
+
+    console.log("[AI] Boxes completed by AI:", boxesCompleted)
+
+    setDrawnLines(newDrawnLines)
+    setCompletedBoxes(newBoxes)
+
+    if (boxesCompleted > 0) {
+      setScores((prev) => ({
+        ...prev,
+        player2: prev.player2 + boxesCompleted,
+      }))
+      setMoveHistory((prev) => [...prev.slice(-2), `AI completed ${boxesCompleted} box(es) - another turn!`])
+      console.log("[AI] AI completed boxes - gets another turn")
+      setAiNeedsAnotherTurn(true)
+    } else {
+      console.log("[AI] AI passed turn - switching to player1")
+      setCurrentPlayer("player1")
+      setMoveHistory((prev) => [...prev.slice(-2), "AI passed to you"])
+    }
+
+    setIsProcessingMove(false)
+  }, [aiPlayer, drawnLines, checkBoxCompletion])
+
+  // Check for game end
+  useEffect(() => {
+    if (completedBoxes.size === totalBoxes && gamePhase === "playing" && gameMode === "ai") {
+      const p1Score = scores.player1
+      const p2Score = scores.player2
+
+      let winningPlayer: "player1" | "player2"
+
+      if (p1Score > p2Score) {
+        winningPlayer = "player1"
+      } else if (p2Score > p1Score) {
+        winningPlayer = "player2"
+      } else {
+        // Tie: player1 wins tiebreaker
+        winningPlayer = "player1"
+      }
+
+      console.log("[Game] Game over! Player 1 score:", p1Score, "Player 2 score:", p2Score, "Winner:", winningPlayer)
+      setWinner(winningPlayer)
+    }
+  }, [completedBoxes, totalBoxes, gamePhase, scores, gameMode])
+
+  // Initialize AI player
+  useEffect(() => {
+    if (gameMode === "ai" && gamePhase === "playing") {
+      const player = new AIPlayer(difficulty)
+      setAiPlayer(player)
+    }
+  }, [gameMode, gamePhase, difficulty])
+
+  // AI turn trigger
+  useEffect(() => {
+    if (gamePhase !== "playing" || isProcessingMove || !aiPlayer) return
+    if (currentPlayer !== "player2") return
+    if (gameMode !== "ai") return
+
+    const timer = setTimeout(() => {
+      console.log("[AI] AI turn triggered")
+      makeAIMove()
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [currentPlayer, gamePhase, isProcessingMove, aiPlayer, gameMode, makeAIMove])
+
+  // AI bonus turn
+  useEffect(() => {
+    if (!aiNeedsAnotherTurn || isProcessingMove || gamePhase !== "playing") return
+
+    const timer = setTimeout(() => {
+      console.log("[AI] AI taking another turn after box completion")
+      setAiNeedsAnotherTurn(false)
+      makeAIMove()
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [aiNeedsAnotherTurn, isProcessingMove, gamePhase, makeAIMove])
+
+  // Timer countdown
+  useEffect(() => {
+    if (gamePhase !== "playing" || timer <= 0) return
+
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          setWinner(scores.player1 > scores.player2 ? "player1" : "player2")
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [gamePhase, timer, scores])
+
+  // Handle line click
+  const handleLineClick = useCallback(
+    (lineId: string) => {
+      if (isProcessingMove || drawnLines.has(lineId) || gamePhase !== "playing") return
+
+      // AI mode: only allow player 1 to click
+      if (gameMode === "ai" && currentPlayer !== "player1") return
+
+      // Multiplayer mode: check blockchain state
+      if (gameMode === "multiplayer") {
+        if (!gameState || !address) return
+        const isPlayer1Turn = gameState.currentPlayer.toLowerCase() === gameState.player1.toLowerCase()
+        const isMyTurn = (isPlayer1Turn && address.toLowerCase() === gameState.player1.toLowerCase()) ||
+                        (!isPlayer1Turn && address.toLowerCase() === gameState.player2.toLowerCase())
+
+        if (!isMyTurn) return
+
+        // Place line on blockchain
+        placeLine(gameId!, lineId)
+        return
+      }
+
+      // AI mode: process move locally
+      setIsProcessingMove(true)
+
+      const newDrawnLines = new Set(drawnLines)
+      newDrawnLines.add(lineId)
+
+      // Check for completed boxes
+      const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines)
+
+      setDrawnLines(newDrawnLines)
+      setCompletedBoxes(newBoxes)
+
+      if (boxesCompleted > 0) {
+        setScores((prev) => ({
+          ...prev,
+          player1: prev.player1 + boxesCompleted,
+        }))
+        setMoveHistory((prev) => [...prev.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
+      } else {
+        setCurrentPlayer("player2")
+        setMoveHistory((prev) => [...prev.slice(-2), "Turn passed"])
+      }
+
+      setIsProcessingMove(false)
+    },
+    [drawnLines, isProcessingMove, gameMode, currentPlayer, gamePhase, checkBoxCompletion, gameState, address, gameId, placeLine],
+  )
+
+  const handleSelectMode = (mode: "ai" | "multiplayer") => {
+    setGameMode(mode)
+    if (mode === "ai") {
+      setGamePhase("difficulty-select")
+    } else {
+      setGamePhase("lobby")
+    }
+  }
+
+  const handleSelectDifficulty = (diff: Difficulty) => {
+    setDifficulty(diff)
+    setGamePhase("playing")
+  }
+
+  const handleCreateGame = () => {
+    createGame()
+  }
+
+  const handleJoinGame = (gameIdToJoin: bigint) => {
+    setGameId(gameIdToJoin)
+    joinGame(gameIdToJoin)
+  }
+
+  // Watch for successful game creation
+  useEffect(() => {
+    if (gameCreated && gameId && gameMode === "multiplayer") {
+      setGamePhase("playing")
+    }
+  }, [gameCreated, gameId, gameMode])
+
+  const handleReset = () => {
+    setScores({ player1: 0, player2: 0 })
+    setWinner(null)
+    setMoveHistory([])
+    setCurrentPlayer("player1")
+    setTimer(180)
+    setDrawnLines(new Set())
+    setCompletedBoxes(new Map())
+    setGamePhase("mode-select")
+    setGameMode(null)
+    setAiPlayer(null)
+    setAiNeedsAnotherTurn(false)
+    setGameId(undefined)
+  }
+
+  // Show wallet connection prompt for multiplayer
+  if (!isConnected && gameMode === "multiplayer") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+        <Header timer={timer} />
+        <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl w-full"
+          >
+            <div className="text-center mb-12">
+              <h1 className="text-5xl md:text-6xl font-black mb-4 bg-gradient-to-r from-cyan-300 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Welcome to BoxBattle!
+              </h1>
+              <p className="text-xl text-slate-300 mb-2">The Ultimate Web3 Strategy Game</p>
+              <p className="text-purple-400">Connect your wallet to start playing</p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
+  // Difficulty selection screen
+  if (gamePhase === "difficulty-select" && gameMode === "ai") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+        <Header timer={timer} />
+        <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
+          <DifficultySelector onSelectDifficulty={handleSelectDifficulty} onBack={() => setGamePhase("mode-select")} />
+        </div>
+      </div>
+    )
+  }
+
+  // Mode selection screen
+  if (gamePhase === "mode-select") {
+    return <GameModeSelector onSelectMode={handleSelectMode} />
+  }
+
+  // Multiplayer lobby
+  if (gamePhase === "lobby" && gameMode === "multiplayer") {
+    return (
+      <MultiplayerLobby
+        onJoinGame={handleJoinGame}
+        onCreateGame={handleCreateGame}
+        onBack={() => setGamePhase("mode-select")}
+        playerAddress={address || ""}
+      />
+    )
+  }
+
+  // Get player addresses
+  const player1Address = gameMode === "ai" ? "You" : gameState?.player1 ? `${gameState.player1.slice(0, 6)}...${gameState.player1.slice(-4)}` : "Waiting..."
+  const player2Address = gameMode === "ai" ? `AI (${difficulty})` : gameState?.player2 ? `${gameState.player2.slice(0, 6)}...${gameState.player2.slice(-4)}` : "Waiting..."
+
+  // Get scores
+  const player1Score = gameMode === "ai" ? scores.player1 : (gameState?.player1Score || 0)
+  const player2Score = gameMode === "ai" ? scores.player2 : (gameState?.player2Score || 0)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+      <Header timer={timer} />
+
+      <div className="flex h-[calc(100vh-120px)] gap-4 p-6">
+        {/* Left Player Card */}
+        <div className="w-1/4">
+          <PlayerCard
+            playerNum={1}
+            score={player1Score}
+            isActive={currentPlayer === "player1"}
+            address={player1Address}
+          />
+        </div>
+
+        {/* Center Game Area */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-6">
+          <GameBoard
+            currentPlayer={currentPlayer}
+            onLineClick={handleLineClick}
+            drawnLines={drawnLines}
+            completedBoxes={completedBoxes}
+          />
+          <div className="text-center">
+            <p className="text-sm text-cyan-300 mb-2 font-bold animate-pulse">
+              {currentPlayer === "player1"
+                ? gameMode === "ai"
+                  ? "🟢 YOUR TURN!"
+                  : "🔵 BLUE PLAYER'S TURN"
+                : gameMode === "ai"
+                  ? "🤖 AI IS THINKING..."
+                  : "🔴 RED PLAYER'S TURN"}
+            </p>
+            <MoveHistory moves={moveHistory} />
+          </div>
+        </div>
+
+        {/* Right Player Card */}
+        <div className="w-1/4">
+          <PlayerCard
+            playerNum={2}
+            score={player2Score}
+            isActive={currentPlayer === "player2"}
+            address={player2Address}
+          />
+        </div>
+      </div>
+
+      {/* Winner Overlay */}
+      {winner && <WinnerOverlay winner={winner} scores={{ player1: player1Score, player2: player2Score }} onPlayAgain={handleReset} />}
+    </div>
+  )
+}
