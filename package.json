@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "next build --webpack",
     "dev": "next dev",
     "ws-server": "node server/websocket-server.js",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",
@@ -75,6 +76,8 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "ignore-loader": "^0.1.2",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.9",

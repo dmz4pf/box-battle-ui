@@ -1,0 +1,15 @@
+diff --git a/node_modules/thread-stream/package.json b/node_modules/thread-stream/package.json
+index 18bdb8b..c9017cb 100644
+--- a/node_modules/thread-stream/package.json
++++ b/node_modules/thread-stream/package.json
+@@ -3,6 +3,10 @@
+   "version": "0.15.2",
+   "description": "A streaming way to send data to a Node.js Worker Thread",
+   "main": "index.js",
++  "exports": {
++    ".": "./index.js",
++    "./lib/*": "./lib/*"
++  },
+   "dependencies": {
+     "real-require": "^0.1.0"
+   },
