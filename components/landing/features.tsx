@@ -1,71 +1,84 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { Swords, Trophy, Coins, BarChart3, Target, Zap } from "lucide-react"
 
 const features = [
   {
-    icon: "⚔️",
+    icon: Swords,
     title: "Real-Time Multiplayer",
     description: "Compete against players worldwide with instant turn resolution and live updates.",
+    color: 'var(--color-player-1)',
   },
   {
-    icon: "🏆",
+    icon: Trophy,
     title: "Ranked Leaderboard",
     description: "Climb the global ranks and earn badges for your strategic prowess.",
+    color: 'var(--color-accent-amber)',
   },
   {
-    icon: "💎",
+    icon: Coins,
     title: "Blockchain Rewards",
     description: "Win games and earn real cryptocurrency rewards instantly to your wallet.",
+    color: 'var(--color-success)',
   },
   {
-    icon: "📊",
+    icon: BarChart3,
     title: "Advanced Analytics",
     description: "Track your stats, analyze patterns, and improve your gameplay with detailed insights.",
+    color: 'var(--color-player-2)',
   },
   {
-    icon: "🎯",
+    icon: Target,
     title: "Custom Tournaments",
     description: "Organize tournaments with friends or join community-run competitive events.",
+    color: 'var(--color-warning)',
   },
   {
-    icon: "⚡",
+    icon: Zap,
     title: "Lightning Fast",
     description: "Sub-100ms move latency powered by optimized backend infrastructure.",
+    color: 'var(--color-accent-blue)',
   },
 ]
 
 export default function Features() {
   return (
     <section id="features" className="px-8 py-24 max-w-7xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-        className="text-center mb-16"
-      >
-        <h2 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
+      <div className="text-center mb-16">
+        <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
           Packed with Power
         </h2>
-        <p className="text-slate-300 text-lg max-w-2xl mx-auto">Everything you need to dominate the competition</p>
-      </motion.div>
+        <p className="text-[var(--color-text-secondary)] text-lg max-w-2xl mx-auto">
+          Everything you need to dominate the competition
+        </p>
+      </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {features.map((feature, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: i * 0.1 }}
-            viewport={{ once: true }}
-            className="border border-indigo-500/20 bg-gradient-to-br from-slate-900/60 to-indigo-900/20 rounded-xl p-6 hover:border-indigo-500/50 transition-all group hover:shadow-lg hover:shadow-indigo-500/10"
-          >
-            <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">{feature.icon}</div>
-            <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
-            <p className="text-slate-400">{feature.description}</p>
-          </motion.div>
-        ))}
+        {features.map((feature, i) => {
+          const Icon = feature.icon
+          return (
+            <div
+              key={i}
+              className="card border hover:border-accent-blue transition-all group"
+            >
+              <div
+                className="w-14 h-14 rounded-lg border-2 flex items-center justify-center mb-4"
+                style={{
+                  backgroundColor: `${feature.color}15`,
+                  borderColor: feature.color,
+                }}
+              >
+                <Icon
+                  className="w-7 h-7"
+                  style={{ color: feature.color }}
+                  strokeWidth={2}
+                />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
+              <p className="text-[var(--color-text-secondary)]">{feature.description}</p>
+            </div>
+          )
+        })}
       </div>
     </section>
   )

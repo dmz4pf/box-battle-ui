@@ -1,9 +1,10 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { Volume2, Settings, Wallet } from "lucide-react"
+import { Volume2, Settings, Wallet, Clock, CheckCircle2, X } from "lucide-react"
 import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { gsap } from "gsap"
+import { animateModalEnter, animateModalExit } from "@/lib/animations"
 
 interface HeaderProps {
   timer: number
@@ -18,122 +19,134 @@ export default function Header({ timer }: HeaderProps) {
   const connectors = useConnectors()
   const [showConnectModal, setShowConnectModal] = useState(false)
 
-  const handleConnect = (connectorId: string) => {
-    const connector = connectors.find((c) => c.id === connectorId)
-    if (connector) {
-      connect({ connector })
+  const modalBackdropRef = useRef<HTMLDivElement>(null)
+  const modalContentRef = useRef<HTMLDivElement>(null)
+
+  // Animate modal on mount/unmount
+  useEffect(() => {
+    if (showConnectModal && modalBackdropRef.current && modalContentRef.current) {
+      animateModalEnter(modalBackdropRef.current, modalContentRef.current)
+    }
+  }, [showConnectModal])
+
+  const handleCloseModal = () => {
+    if (modalBackdropRef.current && modalContentRef.current) {
+      animateModalExit(modalBackdropRef.current, modalContentRef.current).then(() => {
+        setShowConnectModal(false)
+      })
+    } else {
       setShowConnectModal(false)
     }
   }
 
-  return (
-    <header className="border-b-2 border-purple-500/50 bg-gradient-to-r from-slate-950 via-purple-950 to-slate-950 backdrop-blur-md py-4 px-6">
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
-        {/* Title */}
-        <motion.div
-          className="flex items-center gap-3"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          whileHover={{ scale: 1.05 }}
-        >
-          <img src="/boxbattle-logo.svg" alt="BoxBattle Logo" className="w-10 h-10" />
-          <div className="text-3xl font-black">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-              BOXBATTLE ⚡
-            </span>
-          </div>
-        </motion.div>
+  const handleConnect = (connectorId: string) => {
+    const connector = connectors.find((c) => c.id === connectorId)
+    if (connector) {
+      connect({ connector })
+      handleCloseModal()
+    }
+  }
 
-        {/* Center: Prize Pool */}
-        <motion.div
-          className="flex items-center gap-3"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          whileHover={{ scale: 1.08 }}
-        >
-          <div className="px-4 py-2 rounded-full bg-gradient-to-r from-yellow-500 via-purple-500 to-pink-500 shadow-lg shadow-purple-400/50 border-2 border-yellow-300 animate-pulse-glow">
-            <span className="text-white font-black text-sm">💎 0.02 STT Prize</span>
-          </div>
-        </motion.div>
+  return (
+    <header className="bg-bg-primary border-b border-[var(--color-border)] py-4 px-6">
+      <div className="flex items-center justify-between max-w-7xl mx-auto">
+        {/* Logo & Title */}
+        <div className="flex items-center gap-3">
+          <img
+            src="/boxbattle-logo.svg"
+            alt="BoxBattle"
+            className="w-10 h-10"
+          />
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            BOXBATTLE
+          </h1>
+        </div>
 
         {/* Right: Wallet, Timer and Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Wallet Button */}
           {isConnected ? (
-            <motion.button
+            <button
               onClick={() => disconnect()}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400 font-mono text-sm text-green-300 font-bold flex items-center gap-2 hover:bg-green-500/30 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 px-4 py-2 bg-bg-elevated border border-state-success rounded-lg text-sm font-mono text-state-success hover:bg-bg-panel transition-colors duration-200"
             >
-              <Wallet size={16} />
-              {address?.slice(0, 6)}...{address?.slice(-4)}
-            </motion.button>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+            </button>
           ) : (
-            <motion.button
+            <button
               onClick={() => setShowConnectModal(true)}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400 font-bold text-sm text-purple-300 flex items-center gap-2 hover:bg-purple-500/30 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-bg-primary rounded-lg text-sm font-semibold hover:brightness-110 transition-all duration-200"
             >
-              <Wallet size={16} />
-              Connect Wallet
-            </motion.button>
+              <Wallet className="w-4 h-4" />
+              <span>Connect Wallet</span>
+            </button>
           )}
 
-          <motion.div
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-400 font-mono text-sm text-cyan-300 font-bold"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
+          {/* Timer */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-bg-elevated border border-[var(--color-border)] rounded-lg">
+            <Clock className="w-4 h-4 text-[var(--color-text-tertiary)]" />
+            <span className="text-sm font-mono font-semibold text-white">
+              {minutes}:{seconds.toString().padStart(2, "0")}
+            </span>
+          </div>
+
+          {/* Sound Toggle */}
+          <button
+            className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
+            aria-label="Toggle sound"
           >
-            {minutes}:{seconds.toString().padStart(2, "0")}
-          </motion.div>
-          <motion.button
-            className="p-2 hover:bg-purple-500/30 rounded-lg transition-colors text-purple-300 hover:text-purple-200"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            <Volume2 className="w-5 h-5" />
+          </button>
+
+          {/* Settings */}
+          <button
+            className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
+            aria-label="Settings"
           >
-            <Volume2 size={20} />
-          </motion.button>
-          <motion.button
-            className="p-2 hover:bg-purple-500/30 rounded-lg transition-colors text-purple-300 hover:text-purple-200"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Settings size={20} />
-          </motion.button>
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
       {/* Connect Wallet Modal */}
       {showConnectModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
-          onClick={() => setShowConnectModal(false)}
+        <div
+          ref={modalBackdropRef}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-modal-backdrop flex items-center justify-center"
+          onClick={handleCloseModal}
+          style={{ opacity: 0 }}
         >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-gradient-to-br from-slate-900 to-purple-900 border-2 border-purple-500 rounded-2xl p-8 max-w-md w-full mx-4"
+          <div
+            ref={modalContentRef}
+            className="bg-bg-panel border border-[var(--color-border)] rounded-xl p-8 max-w-md w-full mx-4"
             onClick={(e) => e.stopPropagation()}
+            style={{ opacity: 0, transform: 'translateY(40px) scale(0.95)' }}
           >
-            <h2 className="text-2xl font-bold text-white mb-2">Connect Wallet</h2>
-            <p className="text-sm text-purple-300 mb-6">Choose how you want to connect</p>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Connect Wallet</h2>
+                <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
+                  Choose how you want to connect
+                </p>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 hover:bg-bg-elevated rounded-lg transition-colors text-[var(--color-text-tertiary)] hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            {/* Wallet Options */}
+            <div className="space-y-3 mb-6">
               {connectors.map((connector) => {
-                // Check if this is an injected provider (browser extension wallet)
                 const isInjected = connector.type === 'injected' || connector.id.includes('injected')
-
-                // Get wallet name from connector
                 let walletName = connector.name
                 let walletDescription = 'Connect to your wallet'
 
-                // Special handling for common injected wallets
                 if (isInjected) {
                   if (walletName.toLowerCase().includes('metamask')) {
                     walletDescription = 'MetaMask browser extension'
@@ -151,47 +164,51 @@ export default function Header({ timer }: HeaderProps) {
                 }
 
                 return (
-                  <motion.button
+                  <button
                     key={connector.id}
                     onClick={() => handleConnect(connector.id)}
-                    className="w-full px-6 py-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400 rounded-lg text-left hover:bg-purple-500/30 hover:border-purple-300 transition-all group"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    className="w-full px-6 py-4 bg-bg-elevated border border-[var(--color-border)] rounded-lg text-left hover:border-accent-blue hover:bg-bg-primary transition-all duration-200 group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Wallet size={24} className="text-white" />
+                      <div className="w-12 h-12 bg-accent-blue/10 border border-accent-blue/20 rounded-lg flex items-center justify-center group-hover:bg-accent-blue/20 transition-colors">
+                        <Wallet className="w-6 h-6 text-accent-blue" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-white font-bold text-lg">{walletName}</p>
-                        <p className="text-xs text-purple-300">{walletDescription}</p>
+                        <p className="text-white font-semibold">{walletName}</p>
+                        <p className="text-xs text-[var(--color-text-tertiary)]">{walletDescription}</p>
                       </div>
                     </div>
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
 
-            {/* Supported wallets note */}
-            <div className="mt-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-xs text-slate-400 mb-2">Supported Browser Wallets:</p>
+            {/* Supported Wallets Note */}
+            <div className="p-4 bg-bg-elevated rounded-lg border border-[var(--color-border)]">
+              <p className="text-xs text-[var(--color-text-tertiary)] mb-2">
+                Supported Browser Wallets:
+              </p>
               <div className="flex flex-wrap gap-2">
                 {["MetaMask", "Rabby", "Zerion", "Rainbow", "Coinbase", "Trust"].map((wallet) => (
-                  <span key={wallet} className="px-2 py-1 bg-slate-700/50 rounded text-xs text-slate-300">
+                  <span
+                    key={wallet}
+                    className="px-2 py-1 bg-bg-primary rounded text-xs text-[var(--color-text-secondary)]"
+                  >
                     {wallet}
                   </span>
                 ))}
               </div>
             </div>
 
+            {/* Cancel Button */}
             <button
-              onClick={() => setShowConnectModal(false)}
-              className="w-full mt-4 px-6 py-3 border border-slate-600 rounded-lg text-slate-400 hover:bg-slate-800 transition-all"
+              onClick={handleCloseModal}
+              className="w-full mt-4 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all duration-200"
             >
               Cancel
             </button>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </header>
   )

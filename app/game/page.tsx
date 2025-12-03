@@ -1,13 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion } from "framer-motion"
 import { useAccount } from "wagmi"
+import { Trophy, Clock, Zap } from "lucide-react"
 import Header from "@/components/header"
 import GameBoard from "@/components/game-board"
-import PlayerCard from "@/components/player-card"
 import WinnerOverlay from "@/components/winner-overlay"
-import MoveHistory from "@/components/move-history"
 import GameModeSelector from "@/components/game-mode-selector"
 import MultiplayerLobby from "@/components/multiplayer-lobby"
 import DifficultySelector from "@/components/difficulty-selector"
@@ -618,22 +616,18 @@ export default function GamePage() {
   // Show wallet connection prompt
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+      <div className="min-h-screen bg-bg-primary">
         <Header timer={timer} />
         <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl w-full"
-          >
+          <div className="max-w-2xl w-full">
             <div className="text-center mb-12">
-              <h1 className="text-5xl md:text-6xl font-black mb-4 bg-gradient-to-r from-cyan-300 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Welcome to BoxBattle!
+              <h1 className="text-5xl md:text-6xl font-black mb-4 text-white">
+                Welcome to <span className="text-accent-blue">BoxBattle</span>!
               </h1>
-              <p className="text-xl text-slate-300 mb-2">The Ultimate Web3 Strategy Game</p>
-              <p className="text-purple-400">Connect your wallet to start playing</p>
+              <p className="text-xl text-[var(--color-text-secondary)] mb-2">The Ultimate Web3 Strategy Game</p>
+              <p className="text-accent-blue">Connect your wallet to start playing</p>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     )
@@ -643,17 +637,12 @@ export default function GamePage() {
   // Difficulty selection screen
   if (gamePhase === "difficulty-select" && gameMode === "ai") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
-        <Header timer={timer} />
-        <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
-          <DifficultySelector
-            onSelectDifficulty={handleSelectDifficulty}
-            onBack={() => setGamePhase("mode-select")}
-            gridSize={gridSize}
-            onGridSizeChange={(size) => setGridSize(size as 3 | 4 | 5 | 6)}
-          />
-        </div>
-      </div>
+      <DifficultySelector
+        onSelectDifficulty={handleSelectDifficulty}
+        onBack={() => setGamePhase("mode-select")}
+        gridSize={gridSize}
+        onGridSizeChange={(size) => setGridSize(size as 3 | 4 | 5 | 6)}
+      />
     )
   }
 
@@ -707,52 +696,192 @@ export default function GamePage() {
   const isPlayerOne = gameMode === "ai" ? true : (address && gameState ? address.toLowerCase() === gameState.player1.toLowerCase() : true)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 via-indigo-950 to-slate-950">
+    <div
+      className="min-h-screen relative"
+      style={{
+        background: 'radial-gradient(circle at 50% 30%, #1e2541 0%, #151929 40%, #0f141f 100%)',
+        backgroundImage: `
+          radial-gradient(circle at 50% 30%, #1e2541 0%, #151929 40%, #0f141f 100%),
+          repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(59, 130, 246, 0.03) 2px, rgba(59, 130, 246, 0.03) 3px),
+          repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(59, 130, 246, 0.03) 2px, rgba(59, 130, 246, 0.03) 3px)
+        `,
+        backgroundSize: '100% 100%, 40px 40px, 40px 40px',
+      }}
+    >
       <Header timer={timer} gameMode={gameMode} />
 
-      <div className="flex h-[calc(100vh-120px)] gap-4 p-6">
-        {/* Left Player Card */}
-        <div className="w-1/4">
-          <PlayerCard
-            playerNum={1}
-            score={player1Score}
-            isActive={currentPlayer === "player1"}
-            address={player1Name}
-          />
-        </div>
+      {/* Player Stats Bar - Completely Redesigned */}
+      <div className="px-8 py-4">
+        <div className="flex items-center gap-6">
+          {/* Player 1 Section - Score First! */}
+          <div
+            className="flex items-center gap-4 px-6 py-4 rounded-2xl flex-1"
+            style={{
+              background: currentPlayer === "player1"
+                ? 'linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%)'
+                : 'linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%)',
+              border: `2px solid ${currentPlayer === "player1" ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.2)'}`,
+              boxShadow: currentPlayer === "player1" ? '0 4px 24px rgba(59, 130, 246, 0.3)' : 'none',
+            }}
+          >
+            {/* Score - Most Important, Goes First */}
+            <div className="flex items-center gap-3">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '2px solid rgba(59, 130, 246, 0.4)',
+                }}
+              >
+                <Trophy className="w-7 h-7 text-[#3B82F6]" strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-4xl font-black text-[#3B82F6] tabular-nums leading-none mb-1">{player1Score}</p>
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Boxes</p>
+              </div>
+            </div>
 
-        {/* Center Game Area */}
-        <div className="flex-1 flex flex-col items-center justify-center gap-6">
-          <GameBoard
-            currentPlayer={currentPlayer}
-            onLineClick={handleLineClick}
-            drawnLines={drawnLines}
-            completedBoxes={completedBoxes}
-            gridSize={gridSize}
-          />
-          <div className="text-center">
-            <p className="text-sm text-cyan-300 mb-2 font-bold animate-pulse">
-              {currentPlayer === "player1"
-                ? gameMode === "ai"
-                  ? "🟢 YOUR TURN!"
-                  : "🔵 BLUE PLAYER'S TURN"
-                : gameMode === "ai"
-                  ? "🤖 AI IS THINKING..."
-                  : "🔴 RED PLAYER'S TURN"}
-            </p>
-            <MoveHistory moves={moveHistory} />
+            {/* Divider */}
+            <div className="h-12 w-px bg-gradient-to-b from-transparent via-gray-600 to-transparent mx-2" />
+
+            {/* Player Info - Secondary */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-lg font-bold text-white">{player1Name}</p>
+                {currentPlayer === "player1" && (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(59, 130, 246, 0.25)' }}>
+                    <Zap className="w-3.5 h-3.5 text-[#3B82F6]" fill="#3B82F6" />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-[#3B82F6] font-medium uppercase tracking-wide">Player 1</p>
+            </div>
+          </div>
+
+          {/* VS Section - Two-Sided Progress Bar */}
+          <div className="flex flex-col items-center gap-3 px-6">
+            <div className="text-xl font-black text-gray-400 tracking-wider">VS</div>
+            {/* Two-Sided Progress Bar */}
+            <div className="relative w-40 h-3 rounded-full overflow-hidden" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>
+              {/* Player 1 Progress (from left) */}
+              <div
+                className="absolute left-0 top-0 h-full transition-all duration-500 rounded-full"
+                style={{
+                  width: `${player1Score + player2Score === 0 ? 50 : (player1Score / (player1Score + player2Score)) * 100}%`,
+                  background: 'linear-gradient(90deg, #3B82F6 0%, #3B82F6 100%)',
+                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.6)',
+                }}
+              />
+              {/* Player 2 Progress (from right) */}
+              <div
+                className="absolute right-0 top-0 h-full transition-all duration-500 rounded-full"
+                style={{
+                  width: `${player1Score + player2Score === 0 ? 50 : (player2Score / (player1Score + player2Score)) * 100}%`,
+                  background: 'linear-gradient(270deg, #EF4444 0%, #EF4444 100%)',
+                  boxShadow: '0 0 12px rgba(239, 68, 68, 0.6)',
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-black text-[#3B82F6] tabular-nums">{player1Score}</p>
+              <span className="text-gray-500 font-bold">—</span>
+              <p className="text-base font-black text-[#EF4444] tabular-nums">{player2Score}</p>
+            </div>
+          </div>
+
+          {/* Player 2 Section - Mirrored Layout */}
+          <div
+            className="flex items-center gap-4 px-6 py-4 rounded-2xl flex-1"
+            style={{
+              background: currentPlayer === "player2"
+                ? 'linear-gradient(270deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%)'
+                : 'linear-gradient(270deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)',
+              border: `2px solid ${currentPlayer === "player2" ? 'rgba(239, 68, 68, 0.5)' : 'rgba(239, 68, 68, 0.2)'}`,
+              boxShadow: currentPlayer === "player2" ? '0 4px 24px rgba(239, 68, 68, 0.3)' : 'none',
+            }}
+          >
+            {/* Player Info - Secondary */}
+            <div className="flex-1 min-w-0 text-right">
+              <div className="flex items-center justify-end gap-2 mb-1">
+                {currentPlayer === "player2" && (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md" style={{ background: 'rgba(239, 68, 68, 0.25)' }}>
+                    <Zap className="w-3.5 h-3.5 text-[#EF4444]" fill="#EF4444" />
+                  </div>
+                )}
+                <p className="text-lg font-bold text-white">{player2Name}</p>
+              </div>
+              <p className="text-xs text-[#EF4444] font-medium uppercase tracking-wide">Player 2</p>
+            </div>
+
+            {/* Divider */}
+            <div className="h-12 w-px bg-gradient-to-b from-transparent via-gray-600 to-transparent mx-2" />
+
+            {/* Score - Most Important, Goes Last for Symmetry */}
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-4xl font-black text-[#EF4444] tabular-nums leading-none mb-1 text-right">{player2Score}</p>
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider text-right">Boxes</p>
+              </div>
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '2px solid rgba(239, 68, 68, 0.4)',
+                }}
+              >
+                <Trophy className="w-7 h-7 text-[#EF4444]" strokeWidth={2.5} />
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Right Player Card */}
-        <div className="w-1/4">
-          <PlayerCard
-            playerNum={2}
-            score={player2Score}
-            isActive={currentPlayer === "player2"}
-            address={player2Name}
-          />
+      {/* Main Game Area - Centered Layout */}
+      <div className="flex flex-col items-center gap-6 px-8 pb-8">
+        {/* Turn Indicator */}
+        <div
+          className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full text-sm font-semibold"
+          style={{
+            background: currentPlayer === "player1" ? 'rgba(59, 130, 246, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${currentPlayer === "player1" ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: currentPlayer === "player1" ? '#3B82F6' : '#EF4444',
+          }}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>
+            {currentPlayer === "player1"
+              ? gameMode === "ai"
+                ? "Your Turn"
+                : "Player 1's Turn"
+              : gameMode === "ai"
+                ? "AI Thinking..."
+                : "Player 2's Turn"}
+          </span>
         </div>
+
+        {/* Game Board - Absolutely Centered */}
+        <GameBoard
+          currentPlayer={currentPlayer}
+          onLineClick={handleLineClick}
+          drawnLines={drawnLines}
+          completedBoxes={completedBoxes}
+          gridSize={gridSize}
+        />
+
+        {/* Last Move Indicator (Minimal) */}
+        {moveHistory.length > 0 && (
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium"
+            style={{
+              background: 'rgba(148, 163, 184, 0.08)',
+              border: '1px solid rgba(148, 163, 184, 0.15)',
+              color: '#94A3B8',
+            }}
+          >
+            <span className="text-gray-500">Last move:</span>
+            <span className="text-white">{moveHistory[moveHistory.length - 1]}</span>
+          </div>
+        )}
       </div>
 
       {/* Winner Overlay */}
