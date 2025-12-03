@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname } from 'path'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -14,26 +14,28 @@ const nextConfig = {
   },
   // Output standalone for Vercel
   output: 'standalone',
-  // Use webpack config to exclude test files
+  // Use webpack config to ignore problematic test modules
   webpack: (config, { isServer, webpack }) => {
-    // Exclude test files from bundling
-    config.module.rules.push({
-      test: /node_modules\/.+\/(test|tests|__tests__|spec|specs|__specs__)\/.+\.(js|ts|tsx|jsx)$/,
-      use: 'ignore-loader',
-    })
-
-    // Exclude common non-code files
-    config.module.rules.push({
-      test: /node_modules\/.+\/(LICENSE|README\.md|CHANGELOG\.md|\.npmignore|\.gitignore)$/,
-      use: 'ignore-loader',
-    })
-
-    // Replace viem test modules with empty stubs
+    // Ignore viem test modules completely
     config.plugins.push(
-      new webpack.NormalModuleReplacementPlugin(
-        /node_modules\/.+viem.+\/(clients\/createTestClient|clients\/decorators\/test|actions\/test\/.+)\.(js|ts)$/,
-        join(__dirname, 'lib', 'empty-stub.js')
-      )
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^\.\/clients\/createTestClient\.js$/,
+        contextRegExp: /viem\/_esm$/,
+      })
+    )
+
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^\.\/clients\/decorators\/test\.js$/,
+        contextRegExp: /viem\/_esm$/,
+      })
+    )
+
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^\.\/actions\/test\//,
+        contextRegExp: /viem\/_esm$/,
+      })
     )
 
     // Externalize problematic server packages
