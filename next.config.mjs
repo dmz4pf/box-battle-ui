@@ -6,16 +6,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Externalize Node.js packages for Next.js 16+
+  // Minimal Turbopack config - let it use defaults
+  turbopack: {},
+  // Tell Next.js these are server-only packages
   serverExternalPackages: [
     'pino',
     'pino-pretty',
     'thread-stream',
-    '@walletconnect/universal-provider',
-    '@walletconnect/ethereum-provider',
   ],
-  // Empty turbopack config to silence warnings and use Turbopack defaults
-  turbopack: {},
 }
 
 export default nextConfig
