@@ -88,8 +88,8 @@ export default function DifficultySelector({
                 onClick={() => onGridSizeChange(size)}
                 className={`py-3 px-4 rounded-lg font-semibold transition-all ${
                   gridSize === size
-                    ? "bg-accent-blue text-bg-primary shadow-lg"
-                    : "bg-bg-elevated border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-accent-blue"
+                    ? "bg-accent-blue text-bg-primary shadow-lg border-2 border-accent-blue"
+                    : "bg-bg-elevated text-[var(--color-text-secondary)] hover:bg-bg-elevated/80"
                 }`}
               >
                 <div className="text-xl font-bold">{size}×{size}</div>
