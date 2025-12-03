@@ -138,40 +138,53 @@ export function useCreateGame() {
 }
 
 export function useJoinGame() {
-  const { data: entryFee } = useEntryFee()
-  const { writeContract, ...rest } = useWriteContract()
+  const { data: entryFee, isLoading: isLoadingFee, error: feeError } = useEntryFee()
+  const { writeContract, data: hash, ...rest } = useWriteContract()
 
   const joinGame = (gameId: bigint) => {
     console.log('[JoinGame Hook] Called with gameId:', gameId)
     console.log('[JoinGame Hook] Entry fee:', entryFee)
+    console.log('[JoinGame Hook] Loading fee:', isLoadingFee)
+    console.log('[JoinGame Hook] Fee error:', feeError)
 
     if (!entryFee) {
       console.error('[JoinGame Hook] Entry fee not loaded!')
+      alert('⚠️ Entry fee not loaded. Please wait and try again.')
       return
     }
 
-    console.log('[JoinGame Hook] Sending transaction...')
-    writeContract(
-      {
-        address: GAME_CONTRACT_ADDRESS,
-        abi: GAME_CONTRACT_ABI,
-        functionName: 'joinGame',
-        args: [gameId],
-        value: entryFee,
-      },
-      {
-        onSuccess: (hash) => {
-          console.log('[JoinGame Hook] Transaction sent! Hash:', hash)
+    console.log('[JoinGame Hook] Sending transaction with value:', entryFee.toString(), 'wei')
+    try {
+      writeContract(
+        {
+          address: GAME_CONTRACT_ADDRESS,
+          abi: GAME_CONTRACT_ABI,
+          functionName: 'joinGame',
+          args: [gameId],
+          value: entryFee,
+          gas: 500000n, // Explicitly set gas limit to avoid estimation timeout
         },
-        onError: (error) => {
-          console.error('[JoinGame Hook] Transaction error:', error)
-        },
-      }
-    )
+        {
+          onSuccess: (txHash) => {
+            console.log('[JoinGame Hook] ✅ Transaction sent! Hash:', txHash)
+          },
+          onError: (error) => {
+            console.error('[JoinGame Hook] ❌ Transaction error:', error)
+            alert(`❌ Failed to join game: ${error.message}`)
+          },
+        }
+      )
+    } catch (error) {
+      console.error('[JoinGame Hook] ❌ writeContract threw error:', error)
+      alert(`❌ Error: ${error}`)
+    }
   }
 
   return {
     joinGame,
+    isLoadingFee,
+    feeError,
+    hash,
     ...rest,
   }
 }

@@ -31,14 +31,15 @@ export default function Header({ timer }: HeaderProps) {
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Title */}
         <motion.div
-          className="flex items-center gap-2"
+          className="flex items-center gap-3"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           whileHover={{ scale: 1.05 }}
         >
+          <img src="/boxbattle-logo.svg" alt="BoxBattle Logo" className="w-10 h-10" />
           <div className="text-3xl font-black">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-              ⚡ BOXBATTLE ⚡
+              BOXBATTLE ⚡
             </span>
           </div>
         </motion.div>

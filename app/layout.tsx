@@ -10,10 +10,14 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "BoxBattle - Strategic Gaming",
+  title: "BoxBattle ⚡ - Web3 Strategy Game",
   description:
-    "Experience the ultimate competitive Dots and Boxes game with real-time multiplayer and blockchain rewards",
+    "Experience the ultimate competitive Dots and Boxes game with real-time multiplayer and blockchain rewards on Somnia Testnet",
   generator: "v0.app",
+  icons: {
+    icon: '/boxbattle-logo.svg',
+    apple: '/boxbattle-logo.svg',
+  },
 }
 
 export default function RootLayout({

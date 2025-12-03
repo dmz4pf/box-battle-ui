@@ -35,6 +35,18 @@ export function useWebSocketGame({
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Store callbacks in refs to avoid reconnection on callback change
+  const onOpponentMoveRef = useRef(onOpponentMove)
+  const onPlayerJoinedRef = useRef(onPlayerJoined)
+  const onPlayerLeftRef = useRef(onPlayerLeft)
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onOpponentMoveRef.current = onOpponentMove
+    onPlayerJoinedRef.current = onPlayerJoined
+    onPlayerLeftRef.current = onPlayerLeft
+  }, [onOpponentMove, onPlayerJoined, onPlayerLeft])
+
   // Send move to opponent via WebSocket
   const sendMove = useCallback((lineId: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -101,22 +113,22 @@ export function useWebSocketGame({
 
           case 'player-joined':
             console.log(`[WebSocket] Player ${message.playerNum} joined`)
-            if (onPlayerJoined && message.playerNum && message.address) {
-              onPlayerJoined(message.playerNum, message.address)
+            if (onPlayerJoinedRef.current && message.playerNum && message.address) {
+              onPlayerJoinedRef.current(message.playerNum, message.address)
             }
             break
 
           case 'opponent-move':
             console.log(`[WebSocket] Opponent placed line: ${message.lineId}`)
-            if (onOpponentMove && message.lineId && message.playerNum) {
-              onOpponentMove(message.lineId, message.playerNum)
+            if (onOpponentMoveRef.current && message.lineId && message.playerNum) {
+              onOpponentMoveRef.current(message.lineId, message.playerNum)
             }
             break
 
           case 'player-left':
             console.log(`[WebSocket] Player ${message.playerNum} left`)
-            if (onPlayerLeft && message.playerNum && message.address) {
-              onPlayerLeft(message.playerNum, message.address)
+            if (onPlayerLeftRef.current && message.playerNum && message.address) {
+              onPlayerLeftRef.current(message.playerNum, message.address)
             }
             break
 
@@ -146,7 +158,7 @@ export function useWebSocketGame({
         socket.close()
       }
     }
-  }, [enabled, gameId, playerAddress, playerNum, onOpponentMove, onPlayerJoined, onPlayerLeft])
+  }, [enabled, gameId, playerAddress, playerNum])
 
   return {
     isConnected,

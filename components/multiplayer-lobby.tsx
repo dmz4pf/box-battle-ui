@@ -18,6 +18,7 @@ interface MultiplayerLobbyProps {
   gridSize: number
   onGridSizeChange: (size: number) => void
   isJoining?: boolean
+  isJoinPending?: boolean
 }
 
 export default function MultiplayerLobby({
@@ -30,6 +31,7 @@ export default function MultiplayerLobby({
   gridSize,
   onGridSizeChange,
   isJoining,
+  isJoinPending,
 }: MultiplayerLobbyProps) {
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
   const [gameIdInput, setGameIdInput] = useState("")
@@ -309,6 +311,7 @@ export default function MultiplayerLobby({
                     onChange={(e) => setGameIdInput(e.target.value)}
                     placeholder="Enter Game ID from Player 1"
                     className="bg-slate-800 border-purple-500 text-white placeholder-purple-500/50"
+                    disabled={isJoinPending}
                   />
                   <Button
                     onClick={() => {
@@ -318,14 +321,27 @@ export default function MultiplayerLobby({
                       }
                       handleJoinGame()
                     }}
-                    disabled={!gameIdInput || !isOnSomniaTestnet}
-                    className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!gameIdInput || !isOnSomniaTestnet || isJoinPending}
+                    className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
                   >
-                    Join Game
+                    {isJoinPending ? (
+                      <div className="flex items-center gap-2">
+                        <motion.div
+                          className="w-4 h-4 border-2 border-black border-t-transparent rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                        />
+                        Joining...
+                      </div>
+                    ) : (
+                      "Join Game"
+                    )}
                   </Button>
                 </div>
                 <p className="text-xs text-purple-400 mt-2">
-                  Player 1 will share their Game ID with you
+                  {isJoinPending
+                    ? "⏳ Please confirm the transaction in your wallet..."
+                    : "Player 1 will share their Game ID with you"}
                 </p>
               </div>
             </div>

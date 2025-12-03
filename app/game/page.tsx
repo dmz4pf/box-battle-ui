@@ -60,9 +60,11 @@ export default function GamePage() {
   // Multiplayer blockchain state
   const [gameId, setGameId] = useState<bigint | undefined>()
   const [isJoiningGame, setIsJoiningGame] = useState(false)
+  const [player1Address, setPlayer1Address] = useState<string>("")
+  const [player2Address, setPlayer2Address] = useState<string>("")
   const { data: gameState, refetch: refetchGame } = useGameState(gameId)
   const { createGame, hash: createTxHash } = useCreateGame()
-  const { joinGame, isSuccess: gameJoined } = useJoinGame()
+  const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, hash: joinTxHash } = useJoinGame()
 
   // Determine player number (1 for creator, 2 for joiner)
   const playerNum = isJoiningGame ? 2 : (gameId ? 1 : undefined)
@@ -72,7 +74,7 @@ export default function GamePage() {
     gameId,
     playerAddress: address,
     playerNum,
-    enabled: gameMode === "multiplayer" && gamePhase === "playing",
+    enabled: gameMode === "multiplayer" && (gamePhase === "playing" || gamePhase === "lobby"),
     onOpponentMove: (lineId, opponentPlayerNum) => {
       console.log('[WebSocket] 📥 Opponent move received:', lineId, 'from player', opponentPlayerNum)
 
@@ -81,11 +83,58 @@ export default function GamePage() {
         const updated = new Set(prev)
         updated.add(lineId)
         console.log('[WebSocket] Updated drawn lines, total:', updated.size + 1)
+
+        // Check if opponent completed a box with this move
+        const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, updated)
+
+        if (boxesCompleted > 0) {
+          console.log('[WebSocket] 📥 Opponent completed', boxesCompleted, 'box(es) - they keep turn')
+          // Opponent keeps turn, don't switch
+          setScores((prevScores) => ({
+            ...prevScores,
+            [opponentPlayerNum === 1 ? 'player1' : 'player2']: prevScores[opponentPlayerNum === 1 ? 'player1' : 'player2'] + boxesCompleted,
+          }))
+          setCompletedBoxes(newBoxes)
+        } else {
+          console.log('[WebSocket] 📥 Opponent passed turn - now it\'s MY turn!')
+          // Opponent didn't complete a box, switch to my turn
+          setCurrentPlayer(opponentPlayerNum === 1 ? "player2" : "player1")
+        }
+
         return updated
       })
     },
     onPlayerJoined: (joinedPlayerNum, joinedAddress) => {
       console.log('[WebSocket] 🎮 Player', joinedPlayerNum, 'joined:', joinedAddress)
+
+      // Store player addresses
+      if (joinedPlayerNum === 1) {
+        setPlayer1Address(joinedAddress)
+      } else if (joinedPlayerNum === 2) {
+        setPlayer2Address(joinedAddress)
+      }
+
+      // Store opponent's username if they have one
+      const opponentUsername = localStorage.getItem(`username_${joinedAddress}`)
+      if (opponentUsername) {
+        setOpponentUsername(opponentUsername)
+      }
+
+      // If I'm Player 1 and Player 2 just joined, start the game!
+      if (playerNum === 1 && joinedPlayerNum === 2 && gamePhase === "lobby") {
+        console.log('[WebSocket] Player 2 joined! Starting game...')
+        // Set my own address as Player 1
+        if (address) {
+          setPlayer1Address(address)
+        }
+        setPlayer2Address(joinedAddress)
+        setDrawnLines(new Set())
+        setCompletedBoxes(new Map())
+        setScores({ player1: 0, player2: 0 })
+        setCurrentPlayer("player1")
+        setGamePhase("playing")
+        refetchGame()
+      }
     },
     onPlayerLeft: (leftPlayerNum, leftAddress) => {
       console.log('[WebSocket] 👋 Player', leftPlayerNum, 'left:', leftAddress)
@@ -427,9 +476,15 @@ export default function GamePage() {
 
         // Check for completed boxes
         const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines)
+        setCompletedBoxes(newBoxes)
 
         if (boxesCompleted > 0) {
           console.log('[Multiplayer] ✅ Completed', boxesCompleted, 'box(es) - keeping turn')
+          // Update my score
+          setScores((prev) => ({
+            ...prev,
+            [currentPlayer]: prev[currentPlayer] + boxesCompleted,
+          }))
           setMoveHistory((prev) => [...prev.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
           // Keep current turn, don't switch
         } else {
@@ -503,6 +558,10 @@ export default function GamePage() {
   const handleCreateGame = () => {
     console.log('[GamePage] handleCreateGame called')
     console.log('[GamePage] createGame function:', createGame)
+    // Set my address as Player 1
+    if (address) {
+      setPlayer1Address(address)
+    }
     createGame()
   }
 
@@ -510,6 +569,10 @@ export default function GamePage() {
     console.log('[JoinGame] Joining game with ID:', gameIdToJoin)
     setGameId(gameIdToJoin)
     setIsJoiningGame(true)
+    // Set my address as Player 2
+    if (address) {
+      setPlayer2Address(address)
+    }
     console.log('[JoinGame] Calling joinGame function...')
     joinGame(gameIdToJoin)
   }
@@ -523,10 +586,14 @@ export default function GamePage() {
       setTimeout(() => {
         console.log('[GameJoined] Timeout - force transition to playing')
         setGamePhase("playing")
+        // Set my address as Player 2 again in case it wasn't set
+        if (address) {
+          setPlayer2Address(address)
+        }
         refetchGame()
       }, 3000) // Wait 3 seconds for GameStarted event, then force start
     }
-  }, [gameJoined, gameId, gameMode])
+  }, [gameJoined, gameId, gameMode, address])
 
   const handleReset = () => {
     setScores({ player1: 0, player2: 0 })
@@ -614,26 +681,27 @@ export default function GamePage() {
         gridSize={gridSize}
         onGridSizeChange={(size) => setGridSize(size as 3 | 4 | 5 | 6)}
         isJoining={isJoiningGame}
+        isJoinPending={isJoinPending}
       />
     )
   }
 
-  // Get player names
+  // Get player names - use WebSocket-tracked addresses instead of blockchain
   const player1Name = gameMode === "ai"
     ? playerUsername
-    : address && gameState?.player1.toLowerCase() === address.toLowerCase()
+    : address && player1Address && player1Address.toLowerCase() === address.toLowerCase()
       ? playerUsername // If I'm player 1, use my username
-      : localStorage.getItem(`username_${gameState?.player1}`) || `${gameState?.player1?.slice(0, 6)}...${gameState?.player1?.slice(-4)}`
+      : opponentUsername || localStorage.getItem(`username_${player1Address}`) || (player1Address ? `${player1Address.slice(0, 6)}...${player1Address.slice(-4)}` : "Player 1")
 
   const player2Name = gameMode === "ai"
     ? `AI (${difficulty})`
-    : address && gameState?.player2?.toLowerCase() === address.toLowerCase()
+    : address && player2Address && player2Address.toLowerCase() === address.toLowerCase()
       ? playerUsername // If I'm player 2, use my username
-      : localStorage.getItem(`username_${gameState?.player2}`) || (gameState?.player2 ? `${gameState.player2.slice(0, 6)}...${gameState.player2.slice(-4)}` : "Waiting...")
+      : opponentUsername || localStorage.getItem(`username_${player2Address}`) || (player2Address ? `${player2Address.slice(0, 6)}...${player2Address.slice(-4)}` : "Waiting...")
 
-  // Get scores
-  const player1Score = gameMode === "ai" ? scores.player1 : (gameState?.player1Score || 0)
-  const player2Score = gameMode === "ai" ? scores.player2 : (gameState?.player2Score || 0)
+  // Get scores - use local state for both AI and multiplayer
+  const player1Score = scores.player1
+  const player2Score = scores.player2
 
   // Determine if current user is player1
   const isPlayerOne = gameMode === "ai" ? true : (address && gameState ? address.toLowerCase() === gameState.player1.toLowerCase() : true)
