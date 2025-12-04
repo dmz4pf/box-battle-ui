@@ -3,7 +3,8 @@
 import Link from "next/link"
 import { Wallet, X, CheckCircle2 } from "lucide-react"
 import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { animateModalEnter, animateModalExit } from "@/lib/animations"
 
 export default function Navigation() {
   const { address, isConnected } = useAccount()
@@ -12,11 +13,31 @@ export default function Navigation() {
   const connectors = useConnectors()
   const [showConnectModal, setShowConnectModal] = useState(false)
 
+  const modalBackdropRef = useRef<HTMLDivElement>(null)
+  const modalContentRef = useRef<HTMLDivElement>(null)
+
+  // Animate modal on mount/unmount
+  useEffect(() => {
+    if (showConnectModal && modalBackdropRef.current && modalContentRef.current) {
+      animateModalEnter(modalBackdropRef.current, modalContentRef.current)
+    }
+  }, [showConnectModal])
+
+  const handleCloseModal = () => {
+    if (modalBackdropRef.current && modalContentRef.current) {
+      animateModalExit(modalBackdropRef.current, modalContentRef.current).then(() => {
+        setShowConnectModal(false)
+      })
+    } else {
+      setShowConnectModal(false)
+    }
+  }
+
   const handleConnect = (connectorId: string) => {
     const connector = connectors.find((c) => c.id === connectorId)
     if (connector) {
       connect({ connector })
-      setShowConnectModal(false)
+      handleCloseModal()
     }
   }
 
@@ -77,25 +98,35 @@ export default function Navigation() {
       {/* Connect Wallet Modal */}
       {showConnectModal && (
         <div
+          ref={modalBackdropRef}
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-modal-backdrop flex items-center justify-center p-4"
-          onClick={() => setShowConnectModal(false)}
+          onClick={handleCloseModal}
+          style={{ opacity: 0 }}
         >
           <div
-            className="bg-bg-panel border border-[var(--color-border)] rounded-xl p-8 max-w-md w-full"
+            ref={modalContentRef}
+            className="bg-bg-panel border border-[var(--color-border)] rounded-xl p-8 max-w-md w-full mx-4"
             onClick={(e) => e.stopPropagation()}
+            style={{ opacity: 0, transform: 'translateY(40px) scale(0.95)' }}
           >
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-white">Connect Wallet</h2>
-                <p className="text-sm text-[var(--color-text-tertiary)] mt-1">Choose how you want to connect</p>
+                <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
+                  Choose how you want to connect
+                </p>
               </div>
               <button
-                onClick={() => setShowConnectModal(false)}
+                onClick={handleCloseModal}
                 className="p-2 hover:bg-bg-elevated rounded-lg transition-colors text-[var(--color-text-tertiary)] hover:text-white"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Wallet Options */}
 
             <div className="space-y-3 mb-6">
               {connectors.map((connector) => {
@@ -123,11 +154,11 @@ export default function Navigation() {
                   <button
                     key={connector.id}
                     onClick={() => handleConnect(connector.id)}
-                    className="w-full px-6 py-4 bg-bg-elevated border border-[var(--color-border)] rounded-lg text-left hover:border-accent-blue hover:bg-bg-primary transition-all"
+                    className="w-full px-6 py-4 bg-bg-elevated border border-[var(--color-border)] rounded-lg text-left hover:border-accent-blue hover:bg-bg-primary transition-all duration-200 group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-accent-blue/10 border border-accent-blue/20 rounded-lg flex items-center justify-center">
-                        <Wallet size={24} className="text-accent-blue" />
+                      <div className="w-12 h-12 bg-accent-blue/10 border border-accent-blue/20 rounded-lg flex items-center justify-center group-hover:bg-accent-blue/20 transition-colors">
+                        <Wallet className="w-6 h-6 text-accent-blue" />
                       </div>
                       <div className="flex-1">
                         <p className="text-white font-semibold">{walletName}</p>
@@ -139,20 +170,27 @@ export default function Navigation() {
               })}
             </div>
 
+            {/* Supported Wallets Note */}
             <div className="p-4 bg-bg-elevated rounded-lg border border-[var(--color-border)]">
-              <p className="text-xs text-[var(--color-text-tertiary)] mb-2">Supported Browser Wallets:</p>
+              <p className="text-xs text-[var(--color-text-tertiary)] mb-2">
+                Supported Browser Wallets:
+              </p>
               <div className="flex flex-wrap gap-2">
                 {["MetaMask", "Rabby", "Zerion", "Rainbow", "Coinbase", "Trust"].map((wallet) => (
-                  <span key={wallet} className="px-2 py-1 bg-bg-primary rounded text-xs text-[var(--color-text-secondary)]">
+                  <span
+                    key={wallet}
+                    className="px-2 py-1 bg-bg-primary rounded text-xs text-[var(--color-text-secondary)]"
+                  >
                     {wallet}
                   </span>
                 ))}
               </div>
             </div>
 
+            {/* Cancel Button */}
             <button
-              onClick={() => setShowConnectModal(false)}
-              className="w-full mt-4 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all"
+              onClick={handleCloseModal}
+              className="w-full mt-4 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all duration-200"
             >
               Cancel
             </button>

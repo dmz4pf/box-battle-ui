@@ -12,6 +12,8 @@ import DifficultySelector from "@/components/difficulty-selector"
 import GridSizeSelector from "@/components/grid-size-selector"
 import UsernameSetup from "@/components/username-setup"
 import { AIPlayer, type Difficulty } from "@/utils/ai-player"
+import { useAutoplayMusic } from "@/hooks/useSound"
+import { playLineClick, playBoxComplete, playWin, playLose } from "@/lib/sounds"
 import {
   useGameState,
   useCreateGame,
@@ -41,12 +43,23 @@ export default function GamePage() {
   const [gamePhase, setGamePhase] = useState<GamePhase>("username-setup")
   const [gridSize, setGridSize] = useState<3 | 4 | 5 | 6>(5)
 
+  // Dynamic timer based on grid size
+  const getTimerForGridSize = (size: number) => {
+    const timerMap: Record<number, number> = {
+      6: 300, // 5 minutes
+      5: 240, // 4 minutes
+      4: 180, // 3 minutes
+      3: 120, // 2 minutes
+    }
+    return timerMap[size] || 180
+  }
+
   // Game state
   const [currentPlayer, setCurrentPlayer] = useState<"player1" | "player2">("player1")
   const [scores, setScores] = useState({ player1: 0, player2: 0 })
   const [winner, setWinner] = useState<"player1" | "player2" | null>(null)
   const [moveHistory, setMoveHistory] = useState<string[]>([])
-  const [timer, setTimer] = useState(180)
+  const [timer, setTimer] = useState(getTimerForGridSize(gridSize))
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
   const [aiPlayer, setAiPlayer] = useState<AIPlayer | null>(null)
   const [drawnLines, setDrawnLines] = useState<Set<string>>(new Set())
@@ -66,6 +79,9 @@ export default function GamePage() {
 
   // Determine player number (1 for creator, 2 for joiner)
   const playerNum = isJoiningGame ? 2 : (gameId ? 1 : undefined)
+
+  // Autoplay background music on mount
+  useAutoplayMusic()
 
   // WebSocket for real-time moves (NO BLOCKCHAIN SIGNATURES!)
   const { isConnected: wsConnected, sendMove } = useWebSocketGame({
@@ -195,6 +211,13 @@ export default function GamePage() {
   useEffect(() => {
     setTotalBoxes((gridSize - 1) * (gridSize - 1))
   }, [gridSize])
+
+  // Update timer when grid size changes
+  useEffect(() => {
+    if (gamePhase === "mode-select" || gamePhase === "difficulty-select") {
+      setTimer(getTimerForGridSize(gridSize))
+    }
+  }, [gridSize, gamePhase])
 
   // Watch blockchain events
   useWatchGameCreated((event) => {
@@ -377,11 +400,14 @@ export default function GamePage() {
 
       if (p1Score > p2Score) {
         winningPlayer = "player1"
+        playWin()
       } else if (p2Score > p1Score) {
         winningPlayer = "player2"
+        playLose()
       } else {
         // Tie: player1 wins tiebreaker
         winningPlayer = "player1"
+        playWin()
       }
 
       console.log("[Game] Game over! Player 1 score:", p1Score, "Player 2 score:", p2Score, "Winner:", winningPlayer)
@@ -467,6 +493,9 @@ export default function GamePage() {
 
         console.log('[Multiplayer] 📤 Sending move via WebSocket:', lineId)
 
+        // Play line click sound
+        playLineClick()
+
         // Add line locally (optimistic update)
         const newDrawnLines = new Set(drawnLines)
         newDrawnLines.add(lineId)
@@ -478,6 +507,8 @@ export default function GamePage() {
 
         if (boxesCompleted > 0) {
           console.log('[Multiplayer] ✅ Completed', boxesCompleted, 'box(es) - keeping turn')
+          // Play box complete sound
+          playBoxComplete()
           // Update my score
           setScores((prev) => ({
             ...prev,
@@ -500,6 +531,9 @@ export default function GamePage() {
       // AI mode: process move locally
       setIsProcessingMove(true)
 
+      // Play line click sound
+      playLineClick()
+
       const newDrawnLines = new Set(drawnLines)
       newDrawnLines.add(lineId)
 
@@ -510,6 +544,8 @@ export default function GamePage() {
       setCompletedBoxes(newBoxes)
 
       if (boxesCompleted > 0) {
+        // Play box complete sound
+        playBoxComplete()
         setScores((prev) => ({
           ...prev,
           player1: prev.player1 + boxesCompleted,
@@ -598,7 +634,7 @@ export default function GamePage() {
     setWinner(null)
     setMoveHistory([])
     setCurrentPlayer("player1")
-    setTimer(180)
+    setTimer(getTimerForGridSize(gridSize))
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())
     setGamePhase("mode-select")

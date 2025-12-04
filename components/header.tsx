@@ -1,10 +1,11 @@
 "use client"
 
-import { Volume2, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft } from "lucide-react"
+import { Volume2, VolumeX, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft } from "lucide-react"
 import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
 import { useState, useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { animateModalEnter, animateModalExit } from "@/lib/animations"
+import { useBackgroundMusic } from "@/hooks/useSound"
 
 interface HeaderProps {
   timer: number
@@ -24,6 +25,9 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
 
   const modalBackdropRef = useRef<HTMLDivElement>(null)
   const modalContentRef = useRef<HTMLDivElement>(null)
+
+  // Sound controls
+  const { isMuted, toggleMute } = useBackgroundMusic()
 
   // Animate modal on mount/unmount
   useEffect(() => {
@@ -104,10 +108,15 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
 
           {/* Sound Toggle */}
           <button
+            onClick={toggleMute}
             className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
             aria-label="Toggle sound"
           >
-            <Volume2 className="w-5 h-5" />
+            {isMuted ? (
+              <VolumeX className="w-5 h-5" />
+            ) : (
+              <Volume2 className="w-5 h-5" />
+            )}
           </button>
 
           {/* Settings */}
