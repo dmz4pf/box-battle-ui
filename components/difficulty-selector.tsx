@@ -76,7 +76,7 @@ export default function DifficultySelector({
         </div>
 
         {/* Grid Size Selector */}
-        <div className="card border mb-8">
+        <div className="card border-2 border-accent-blue/40 mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Grid3x3 className="w-5 h-5 text-accent-blue" />
             <h3 className="text-lg font-semibold text-white">Select Grid Size</h3>
