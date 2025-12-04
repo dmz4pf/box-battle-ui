@@ -22,6 +22,7 @@ import {
   useWatchGameStarted,
   useWatchGameEnded,
   useWaitForTransactionReceipt,
+  useGameCounter,
 } from "@/hooks/useGameContract"
 import { useWebSocketGame } from "@/hooks/useWebSocketGame"
 import { decodeEventLog } from "viem"
@@ -157,19 +158,24 @@ export default function GamePage() {
   })
 
   // Wait for create game transaction and extract game ID from logs
-  const { data: txReceipt, isSuccess: isTxConfirmed, isLoading: isTxPending } = useWaitForTransactionReceipt({
+  const { data: txReceipt, isSuccess: isTxConfirmed, isLoading: isTxPending, isError: isTxError } = useWaitForTransactionReceipt({
     hash: createTxHash,
   })
 
   console.log('[Receipt Watcher] createTxHash:', createTxHash)
   console.log('[Receipt Watcher] isTxPending:', isTxPending)
   console.log('[Receipt Watcher] isTxConfirmed:', isTxConfirmed)
+  console.log('[Receipt Watcher] isTxError:', isTxError)
   console.log('[Receipt Watcher] txReceipt:', txReceipt)
 
-  // Extract gameId from transaction receipt
-  useEffect(() => {
-    console.log('[Receipt Effect] Running with:', { isTxConfirmed, hasReceipt: !!txReceipt, hasGameId: !!gameId })
+  // Fallback: Use game counter when receipt fails
+  const { data: gameCounter } = useGameCounter()
 
+  // Extract gameId from transaction receipt OR use counter fallback
+  useEffect(() => {
+    console.log('[Receipt Effect] Running with:', { isTxConfirmed, isTxError, hasReceipt: !!txReceipt, hasGameId: !!gameId, gameCounter: gameCounter?.toString() })
+
+    // If receipt parsing succeeds, use it
     if (isTxConfirmed && txReceipt && !gameId) {
       console.log('[Transaction Confirmed] Receipt:', txReceipt)
       console.log('[Transaction Confirmed] Logs count:', txReceipt.logs.length)
@@ -207,7 +213,23 @@ export default function GamePage() {
         console.error('[Transaction Confirmed] NO GameCreated event found in transaction logs!')
       }
     }
-  }, [isTxConfirmed, txReceipt, gameId])
+
+    // Fallback: If receipt times out but we have a hash and game counter, use counter
+    if (createTxHash && !gameId && !isTxPending && !isTxConfirmed && gameCounter) {
+      console.log('[Fallback] Receipt timed out, using game counter as fallback')
+      console.log('[Fallback] Game counter:', gameCounter.toString())
+      console.log('[Fallback] Assuming this is the game we just created')
+
+      // Wait a bit to ensure transaction is mined
+      setTimeout(() => {
+        if (!gameId) { // Double check we haven't gotten it another way
+          console.log('[Fallback] Setting gameId to counter:', gameCounter.toString())
+          setGameId(gameCounter)
+          setGamePhase("lobby")
+        }
+      }, 3000)
+    }
+  }, [isTxConfirmed, isTxError, isTxPending, txReceipt, gameId, createTxHash, gameCounter])
 
   // Check for existing username on mount
   useEffect(() => {

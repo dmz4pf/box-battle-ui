@@ -117,9 +117,9 @@ export const config = createConfig({
   connectors,
   transports: {
     [somniaTestnet.id]: http('https://dream-rpc.somnia.network', {
-      timeout: 30000, // 30 second timeout
-      retryCount: 3,
-      retryDelay: 1000,
+      timeout: 60000, // 60 second timeout (Somnia RPC can be slow)
+      retryCount: 5,   // More retries
+      retryDelay: 2000, // Wait 2s between retries
     }),
   },
 })
