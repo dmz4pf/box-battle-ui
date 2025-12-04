@@ -193,6 +193,12 @@ export default function GamePage() {
 
       // Find the GameCreated event in the logs
       const gameCreatedLog = txReceipt.logs.find((log) => {
+        // First check if log is from our contract
+        if (log.address.toLowerCase() !== GAME_CONTRACT_ADDRESS.toLowerCase()) {
+          console.log('[Log Filter] Skipping log from different contract:', log.address)
+          return false
+        }
+
         try {
           const decoded = decodeEventLog({
             abi: GAME_CONTRACT_ABI,
