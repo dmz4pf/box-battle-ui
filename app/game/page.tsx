@@ -227,8 +227,9 @@ export default function GamePage() {
     console.log('[GameCreated] Game ID:', event.gameId)
 
     if (event.player1?.toLowerCase() === address?.toLowerCase()) {
-      console.log('[GameCreated] This is my game! Setting gameId:', event.gameId)
+      console.log('[GameCreated] This is my game! Setting gameId and transitioning to lobby')
       setGameId(event.gameId)
+      setGamePhase("lobby")
     } else {
       console.log('[GameCreated] Not my game, ignoring')
     }
