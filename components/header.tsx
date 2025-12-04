@@ -139,7 +139,7 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
 
             {/* Sound Dropdown Menu */}
             {showSoundMenu && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-bg-panel border border-[var(--color-border)] rounded-lg shadow-lg p-4 z-50">
+              <div className="absolute right-0 top-full mt-2 w-56 bg-bg-panel border border-[var(--color-border)] rounded-lg shadow-xl p-4 z-50" style={{ backgroundColor: 'rgba(20, 24, 35, 0.98)' }}>
                 <h3 className="text-sm font-semibold text-white mb-3">Sound Settings</h3>
 
                 {/* Background Music Toggle */}

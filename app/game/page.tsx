@@ -160,8 +160,16 @@ export default function GamePage() {
       }
     },
     onPlayerLeft: (leftPlayerNum, leftAddress) => {
-      // Player left game
-      alert(`Player ${leftPlayerNum} left the game!`)
+      // Player left game - I win!
+      const myPlayerKey = leftPlayerNum === 1 ? "player2" : "player1"
+
+      setWinner(myPlayerKey)
+
+      // Show win message and return to mode selection
+      setTimeout(() => {
+        alert(`Player ${leftPlayerNum} left the game. You win!`)
+        handleReset()
+      }, 100)
     },
     onPlayerQuit: (quitPlayerNum) => {
       // Opponent quit - I win!
