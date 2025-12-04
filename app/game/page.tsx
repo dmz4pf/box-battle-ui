@@ -89,6 +89,11 @@ export default function GamePage() {
   // Autoplay background music on mount
   useAutoplayMusic()
 
+  // Random coin toss for first turn
+  const getRandomFirstPlayer = (): "player1" | "player2" => {
+    return Math.random() < 0.5 ? "player1" : "player2"
+  }
+
   // WebSocket for real-time moves (NO BLOCKCHAIN SIGNATURES!)
   const { isConnected: wsConnected, sendMove, sendQuit, sendPlayAgainRequest, sendPlayAgainResponse } = useWebSocketGame({
     gameId,
@@ -157,7 +162,7 @@ export default function GamePage() {
         setDrawnLines(new Set())
         setCompletedBoxes(new Map())
         setScores({ player1: 0, player2: 0 })
-        setCurrentPlayer("player1")
+        setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
         setGamePhase("playing")
         refetchGame()
       }
@@ -310,7 +315,7 @@ export default function GamePage() {
       setDrawnLines(new Set())
       setCompletedBoxes(new Map())
       setScores({ player1: 0, player2: 0 })
-      setCurrentPlayer("player1") // Player 1 always starts
+      setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
       setGamePhase("playing")
       refetchGame()
     } else {
@@ -771,7 +776,7 @@ export default function GamePage() {
     setScores({ player1: 0, player2: 0 })
     setWinner(null)
     setMoveHistory([])
-    setCurrentPlayer("player1")
+    setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
     setTimer(getTimerForGridSize(gridSize))
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())
