@@ -12,9 +12,11 @@ interface HeaderProps {
   onBack?: () => void
   showBackButton?: boolean
   gameMode?: "ai" | "multiplayer" | null
+  onUsernameChange?: (newUsername: string) => void
+  currentUsername?: string
 }
 
-export default function Header({ timer, onBack, showBackButton, gameMode }: HeaderProps) {
+export default function Header({ timer, onBack, showBackButton, gameMode, onUsernameChange, currentUsername }: HeaderProps) {
   const minutes = Math.floor(timer / 60)
   const seconds = timer % 60
   const { address, isConnected } = useAccount()
@@ -31,6 +33,12 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
   const { isMuted: isSfxMuted, toggleMute: toggleSfx } = useSoundEffects()
   const [showSoundMenu, setShowSoundMenu] = useState(false)
   const soundMenuRef = useRef<HTMLDivElement>(null)
+
+  // Settings modal
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [usernameInput, setUsernameInput] = useState("")
+  const settingsBackdropRef = useRef<HTMLDivElement>(null)
+  const settingsContentRef = useRef<HTMLDivElement>(null)
 
   // Close sound menu when clicking outside
   useEffect(() => {
@@ -53,6 +61,14 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
     }
   }, [showConnectModal])
 
+  // Animate settings modal
+  useEffect(() => {
+    if (showSettingsModal && settingsBackdropRef.current && settingsContentRef.current) {
+      animateModalEnter(settingsBackdropRef.current, settingsContentRef.current)
+      setUsernameInput(currentUsername || "")
+    }
+  }, [showSettingsModal, currentUsername])
+
   const handleCloseModal = () => {
     if (modalBackdropRef.current && modalContentRef.current) {
       animateModalExit(modalBackdropRef.current, modalContentRef.current).then(() => {
@@ -68,6 +84,24 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
     if (connector) {
       connect({ connector })
       handleCloseModal()
+    }
+  }
+
+  const handleCloseSettingsModal = () => {
+    if (settingsBackdropRef.current && settingsContentRef.current) {
+      animateModalExit(settingsBackdropRef.current, settingsContentRef.current).then(() => {
+        setShowSettingsModal(false)
+      })
+    } else {
+      setShowSettingsModal(false)
+    }
+  }
+
+  const handleSaveUsername = () => {
+    const trimmed = usernameInput.trim()
+    if (trimmed && onUsernameChange) {
+      onUsernameChange(trimmed)
+      handleCloseSettingsModal()
     }
   }
 
@@ -122,6 +156,17 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
               {minutes}:{seconds.toString().padStart(2, "0")}
             </span>
           </div>
+
+          {/* Settings Button */}
+          {onUsernameChange && (
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Sound Menu */}
           <div className="relative" ref={soundMenuRef}>
@@ -285,6 +330,80 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div
+          ref={settingsBackdropRef}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-modal-backdrop flex items-center justify-center"
+          onClick={handleCloseSettingsModal}
+          style={{ opacity: 0 }}
+        >
+          <div
+            ref={settingsContentRef}
+            className="bg-bg-panel border border-[var(--color-border)] rounded-xl p-8 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+            style={{ opacity: 0, transform: 'translateY(40px) scale(0.95)' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Settings</h2>
+                <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
+                  Customize your profile
+                </p>
+              </div>
+              <button
+                onClick={handleCloseSettingsModal}
+                className="p-2 hover:bg-bg-elevated rounded-lg transition-colors text-[var(--color-text-tertiary)] hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Username Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-white mb-2">
+                Username
+              </label>
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="Enter your username"
+                className="w-full px-4 py-3 bg-bg-elevated border border-[var(--color-border)] rounded-lg text-white placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:border-accent-blue transition-colors"
+                maxLength={20}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveUsername()
+                  }
+                }}
+              />
+              <p className="text-xs text-[var(--color-text-tertiary)] mt-2">
+                This is how other players will see you in the game
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleCloseSettingsModal}
+                className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveUsername}
+                disabled={!usernameInput.trim()}
+                className="flex-1 px-6 py-3 bg-accent-blue text-bg-primary rounded-lg font-semibold hover:brightness-110 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       )}

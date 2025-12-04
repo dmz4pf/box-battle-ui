@@ -7,6 +7,7 @@ export interface WebSocketGameMessage {
   playersInRoom?: number
   playerNum?: number
   address?: string
+  username?: string
   lineId?: string
   gridSize?: number
   timestamp?: number
@@ -18,9 +19,10 @@ export interface UseWebSocketGameProps {
   gameId?: bigint
   playerAddress?: string
   playerNum?: number
+  playerUsername?: string
   gridSize?: number
   onOpponentMove?: (lineId: string, playerNum: number) => void
-  onPlayerJoined?: (playerNum: number, address: string) => void
+  onPlayerJoined?: (playerNum: number, address: string, username?: string) => void
   onPlayerLeft?: (playerNum: number, address: string) => void
   onPlayerQuit?: (playerNum: number) => void
   onGridSizeReceived?: (gridSize: number) => void
@@ -36,6 +38,7 @@ export function useWebSocketGame({
   gameId,
   playerAddress,
   playerNum,
+  playerUsername,
   gridSize,
   onOpponentMove,
   onPlayerJoined,
@@ -172,6 +175,7 @@ export function useWebSocketGame({
         gameId: gameId.toString(),
         address: playerAddress,
         playerNum,
+        username: playerUsername,
         gridSize: gridSize || 5 // Send grid size (Player 1's selection)
       }
 
@@ -191,9 +195,9 @@ export function useWebSocketGame({
             break
 
           case 'player-joined':
-            console.log(`[WebSocket] Player ${message.playerNum} joined`)
+            console.log(`[WebSocket] Player ${message.playerNum} joined with username: ${message.username}`)
             if (onPlayerJoinedRef.current && message.playerNum && message.address) {
-              onPlayerJoinedRef.current(message.playerNum, message.address)
+              onPlayerJoinedRef.current(message.playerNum, message.address, message.username)
             }
             break
 

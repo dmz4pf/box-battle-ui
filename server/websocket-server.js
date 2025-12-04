@@ -63,12 +63,12 @@ wss.on('connection', (ws) => {
 });
 
 function handleJoinGame(ws, data) {
-  const { gameId, address, playerNum, gridSize } = data;
+  const { gameId, address, playerNum, gridSize, username } = data;
 
-  console.log(`🎮 Player ${playerNum} (${address}) joining game ${gameId} with gridSize ${gridSize}`);
+  console.log(`🎮 Player ${playerNum} (${address}) [${username || 'no username'}] joining game ${gameId} with gridSize ${gridSize}`);
 
-  // Store player info (including gridSize for Player 1)
-  playerInfo.set(ws, { gameId, address, playerNum, gridSize });
+  // Store player info (including gridSize for Player 1 and username)
+  playerInfo.set(ws, { gameId, address, playerNum, gridSize, username });
 
   // Add player to game room
   if (!gameRooms.has(gameId)) {
@@ -118,6 +118,7 @@ function handleJoinGame(ws, data) {
     type: 'player-joined',
     playerNum,
     address,
+    username,
     playersInRoom: gameRooms.get(gameId).size
   });
 

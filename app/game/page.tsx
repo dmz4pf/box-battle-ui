@@ -94,6 +94,7 @@ export default function GamePage() {
     gameId,
     playerAddress: address,
     playerNum,
+    playerUsername,
     gridSize,
     enabled: gameMode === "multiplayer" && (gamePhase === "playing" || gamePhase === "lobby"),
     onGridSizeReceived: (receivedGridSize) => {
@@ -130,20 +131,20 @@ export default function GamePage() {
         return updated
       })
     },
-    onPlayerJoined: (joinedPlayerNum, joinedAddress) => {
+    onPlayerJoined: (joinedPlayerNum, joinedAddress, joinedUsername) => {
       // Player joined game
 
-      // Store player addresses
+      // Store player addresses and username
       if (joinedPlayerNum === 1) {
         setPlayer1Address(joinedAddress)
       } else if (joinedPlayerNum === 2) {
         setPlayer2Address(joinedAddress)
       }
 
-      // Store opponent's username if they have one
-      const opponentUsername = localStorage.getItem(`username_${joinedAddress}`)
-      if (opponentUsername) {
-        setOpponentUsername(opponentUsername)
+      // Store opponent's username from WebSocket message
+      if (joinedUsername) {
+        console.log(`[Game] Received opponent username: ${joinedUsername}`)
+        setOpponentUsername(joinedUsername)
       }
 
       // If I'm Player 1 and Player 2 just joined, start the game!
@@ -811,6 +812,14 @@ export default function GamePage() {
     }
   }
 
+  const handleUsernameChange = (newUsername: string) => {
+    // Update username in localStorage and state
+    if (address) {
+      localStorage.setItem(`username_${address}`, newUsername)
+      setPlayerUsername(newUsername)
+    }
+  }
+
   // Username setup phase
   if (!playerUsername && gamePhase === "username-setup" && isConnected) {
     return <UsernameSetup onSubmit={handleUsernameSubmit} address={address || ""} />
@@ -916,6 +925,8 @@ export default function GamePage() {
         gameMode={gameMode}
         showBackButton={gamePhase === "playing" || gamePhase === "lobby"}
         onBack={handleBack}
+        onUsernameChange={handleUsernameChange}
+        currentUsername={playerUsername}
       />
 
       {/* Player Stats Bar - Completely Redesigned */}
