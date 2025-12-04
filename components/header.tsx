@@ -59,7 +59,7 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo & Title */}
         <div className="flex items-center gap-3">
-          {showBackButton && onBack && gameMode === "ai" && (
+          {showBackButton && onBack && (
             <button
               onClick={onBack}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--color-text-tertiary)] hover:text-white hover:bg-bg-elevated transition-colors"
@@ -117,14 +117,6 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
             ) : (
               <Volume2 className="w-5 h-5" />
             )}
-          </button>
-
-          {/* Settings */}
-          <button
-            className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
-            aria-label="Settings"
-          >
-            <Settings className="w-5 h-5" />
           </button>
         </div>
       </div>

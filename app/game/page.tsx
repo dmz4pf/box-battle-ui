@@ -69,6 +69,7 @@ export default function GamePage() {
   const [isProcessingMove, setIsProcessingMove] = useState(false)
   const [totalBoxes, setTotalBoxes] = useState((gridSize - 1) * (gridSize - 1))
   const [aiNeedsAnotherTurn, setAiNeedsAnotherTurn] = useState(false)
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false)
 
   // Multiplayer blockchain state
   const [gameId, setGameId] = useState<bigint | undefined>()
@@ -708,6 +709,20 @@ export default function GamePage() {
     }
   }, [gameJoined, gameId, gameMode, address])
 
+  const handleBack = () => {
+    // Show confirmation for multiplayer or in-progress games
+    if (gameMode === "multiplayer" || (gamePhase === "playing" && drawnLines.size > 0)) {
+      setShowQuitConfirm(true)
+    } else {
+      handleReset()
+    }
+  }
+
+  const handleConfirmQuit = () => {
+    setShowQuitConfirm(false)
+    handleReset()
+  }
+
   const handleReset = () => {
     setScores({ player1: 0, player2: 0 })
     setWinner(null)
@@ -829,8 +844,8 @@ export default function GamePage() {
       <Header
         timer={timer}
         gameMode={gameMode}
-        showBackButton={gamePhase === "playing"}
-        onBack={handleReset}
+        showBackButton={gamePhase === "playing" || gamePhase === "lobby"}
+        onBack={handleBack}
       />
 
       {/* Player Stats Bar - Completely Redesigned */}
@@ -1018,6 +1033,34 @@ export default function GamePage() {
           player2Name={player2Name}
           gameMode={gameMode || "ai"}
         />
+      )}
+
+      {/* Quit Confirmation Modal */}
+      {showQuitConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-panel border border-[var(--color-border)] rounded-xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-4">Quit Game?</h2>
+            <p className="text-[var(--color-text-secondary)] mb-6">
+              {gameMode === "multiplayer"
+                ? "Are you sure you want to quit? Your opponent will be notified and the game will end."
+                : "Are you sure you want to quit? Your progress will be lost."}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowQuitConfirm(false)}
+                className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmQuit}
+                className="flex-1 px-6 py-3 bg-state-error text-white rounded-lg hover:brightness-110 transition-all duration-200 font-semibold"
+              >
+                Quit Game
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
