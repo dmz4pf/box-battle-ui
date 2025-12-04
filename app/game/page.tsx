@@ -390,9 +390,9 @@ export default function GamePage() {
     setIsProcessingMove(false)
   }, [aiPlayer, drawnLines, checkBoxCompletion, gridSize])
 
-  // Check for game end
+  // Check for game end (works for BOTH AI and Multiplayer)
   useEffect(() => {
-    if (completedBoxes.size === totalBoxes && gamePhase === "playing" && gameMode === "ai") {
+    if (completedBoxes.size === totalBoxes && gamePhase === "playing") {
       const p1Score = scores.player1
       const p2Score = scores.player2
 
@@ -400,20 +400,44 @@ export default function GamePage() {
 
       if (p1Score > p2Score) {
         winningPlayer = "player1"
-        playWin()
       } else if (p2Score > p1Score) {
         winningPlayer = "player2"
-        playLose()
       } else {
         // Tie: player1 wins tiebreaker
         winningPlayer = "player1"
-        playWin()
       }
 
-      console.log("[Game] Game over! Player 1 score:", p1Score, "Player 2 score:", p2Score, "Winner:", winningPlayer)
+      // Play correct sound for each player
+      if (gameMode === "ai") {
+        // AI mode: player is always player1
+        if (winningPlayer === "player1") {
+          playWin()
+        } else {
+          playLose()
+        }
+      } else if (gameMode === "multiplayer") {
+        // Multiplayer: check which player I am
+        const iAmPlayer1 = playerNum === 1
+        const iAmPlayer2 = playerNum === 2
+
+        if ((iAmPlayer1 && winningPlayer === "player1") || (iAmPlayer2 && winningPlayer === "player2")) {
+          playWin()
+        } else {
+          playLose()
+        }
+      }
+
+      console.log("[Game] Game over!", {
+        mode: gameMode,
+        p1Score,
+        p2Score,
+        winner: winningPlayer,
+        myPlayerNum: playerNum
+      })
+
       setWinner(winningPlayer)
     }
-  }, [completedBoxes, totalBoxes, gamePhase, scores, gameMode])
+  }, [completedBoxes, totalBoxes, gamePhase, scores, gameMode, playerNum])
 
   // Initialize AI player
   useEffect(() => {
@@ -642,6 +666,9 @@ export default function GamePage() {
     setAiPlayer(null)
     setAiNeedsAnotherTurn(false)
     setGameId(undefined)
+    setIsJoiningGame(false) // Reset player number determination
+    setPlayer1Address("")
+    setPlayer2Address("")
   }
 
   // Username setup phase
