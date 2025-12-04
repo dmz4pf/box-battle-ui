@@ -27,6 +27,7 @@ import {
 import { useWebSocketGame } from "@/hooks/useWebSocketGame"
 import { decodeEventLog } from "viem"
 import { GAME_CONTRACT_ABI } from "@/lib/contract-abi"
+import { GAME_CONTRACT_ADDRESS } from "@/lib/wagmi-config"
 
 type GameMode = "ai" | "multiplayer" | null
 type GamePhase = "username-setup" | "mode-select" | "difficulty-select" | "lobby" | "playing"
@@ -179,6 +180,16 @@ export default function GamePage() {
     if (isTxConfirmed && txReceipt && !gameId) {
       console.log('[Transaction Confirmed] Receipt:', txReceipt)
       console.log('[Transaction Confirmed] Logs count:', txReceipt.logs.length)
+      console.log('[Transaction Confirmed] Receipt status:', txReceipt.status)
+
+      // Log all raw logs to see what we have
+      txReceipt.logs.forEach((log, index) => {
+        console.log(`[Log ${index}]`, {
+          address: log.address,
+          topics: log.topics,
+          data: log.data
+        })
+      })
 
       // Find the GameCreated event in the logs
       const gameCreatedLog = txReceipt.logs.find((log) => {
@@ -188,10 +199,10 @@ export default function GamePage() {
             data: log.data,
             topics: log.topics,
           })
-          console.log('[Log Decode] Found event:', decoded.eventName)
+          console.log('[Log Decode] Found event:', decoded.eventName, 'args:', decoded.args)
           return decoded.eventName === 'GameCreated'
         } catch (e) {
-          console.log('[Log Decode] Failed to decode log, skipping')
+          console.log('[Log Decode] Failed to decode log:', e)
           return false
         }
       })
@@ -211,6 +222,8 @@ export default function GamePage() {
         setGamePhase("lobby")
       } else {
         console.error('[Transaction Confirmed] NO GameCreated event found in transaction logs!')
+        console.error('[Transaction Confirmed] This might mean the transaction reverted or contract address is wrong')
+        console.error('[Transaction Confirmed] Contract address we are watching:', GAME_CONTRACT_ADDRESS)
       }
     }
 
