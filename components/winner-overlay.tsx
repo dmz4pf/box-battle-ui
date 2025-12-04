@@ -8,6 +8,7 @@ interface WinnerOverlayProps {
   winner: "player1" | "player2"
   scores: { player1: number; player2: number }
   onPlayAgain: () => void
+  onBackToMenu?: () => void
   isPlayerOne: boolean
   player1Name?: string
   player2Name?: string
@@ -18,6 +19,7 @@ export default function WinnerOverlay({
   winner,
   scores,
   onPlayAgain,
+  onBackToMenu,
   isPlayerOne,
   player1Name = "Player 1",
   player2Name = "Player 2",
@@ -151,16 +153,18 @@ export default function WinnerOverlay({
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          <button
-            onClick={onPlayAgain}
-            className="button-primary w-full py-3 flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-5 h-5" />
-            Play Again
-          </button>
+          {gameMode === "ai" && (
+            <button
+              onClick={onPlayAgain}
+              className="button-primary w-full py-3 flex items-center justify-center gap-2"
+            >
+              <RotateCcw className="w-5 h-5" />
+              Play Again
+            </button>
+          )}
 
           <button
-            onClick={onPlayAgain}
+            onClick={onBackToMenu || onPlayAgain}
             className="w-full py-3 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-bg-elevated hover:text-white transition-all flex items-center justify-center gap-2"
           >
             <Home className="w-5 h-5" />

@@ -87,7 +87,7 @@ export default function GamePage() {
   useAutoplayMusic()
 
   // WebSocket for real-time moves (NO BLOCKCHAIN SIGNATURES!)
-  const { isConnected: wsConnected, sendMove } = useWebSocketGame({
+  const { isConnected: wsConnected, sendMove, sendQuit } = useWebSocketGame({
     gameId,
     playerAddress: address,
     playerNum,
@@ -162,6 +162,19 @@ export default function GamePage() {
     onPlayerLeft: (leftPlayerNum, leftAddress) => {
       // Player left game
       alert(`Player ${leftPlayerNum} left the game!`)
+    },
+    onPlayerQuit: (quitPlayerNum) => {
+      // Opponent quit - I win!
+      const opponentPlayerKey = quitPlayerNum === 1 ? "player1" : "player2"
+      const myPlayerKey = quitPlayerNum === 1 ? "player2" : "player1"
+
+      setWinner(myPlayerKey)
+      setGamePhase("mode-select")
+
+      // Show win message
+      setTimeout(() => {
+        alert(`Player ${quitPlayerNum} quit the game. You win!`)
+      }, 100)
     }
   })
 
@@ -678,6 +691,12 @@ export default function GamePage() {
 
   const handleConfirmQuit = () => {
     setShowQuitConfirm(false)
+
+    // Send quit notification to opponent if in multiplayer
+    if (gameMode === "multiplayer" && sendQuit) {
+      sendQuit()
+    }
+
     handleReset()
   }
 
@@ -697,6 +716,18 @@ export default function GamePage() {
     setIsJoiningGame(false) // Reset player number determination
     setPlayer1Address("")
     setPlayer2Address("")
+  }
+
+  const handleRestartAI = () => {
+    // Restart AI game with same difficulty and grid size
+    setScores({ player1: 0, player2: 0 })
+    setWinner(null)
+    setMoveHistory([])
+    setCurrentPlayer("player1")
+    setTimer(getTimerForGridSize(gridSize))
+    setDrawnLines(new Set())
+    setCompletedBoxes(new Map())
+    // Keep gameMode, difficulty, aiPlayer, and gridSize
   }
 
   // Username setup phase
@@ -985,7 +1016,8 @@ export default function GamePage() {
         <WinnerOverlay
           winner={winner}
           scores={{ player1: player1Score, player2: player2Score }}
-          onPlayAgain={handleReset}
+          onPlayAgain={gameMode === "ai" ? handleRestartAI : handleReset}
+          onBackToMenu={handleReset}
           isPlayerOne={isPlayerOne}
           player1Name={player1Name}
           player2Name={player2Name}

@@ -28,6 +28,10 @@ wss.on('connection', (ws) => {
           handleMove(ws, data);
           break;
 
+        case 'player-quit':
+          handlePlayerQuit(ws, data);
+          break;
+
         case 'leave':
           handleLeaveGame(ws);
           break;
@@ -118,6 +122,27 @@ function handleMove(ws, data) {
   broadcastToRoom(gameId, ws, {
     type: 'opponent-move',
     lineId,
+    playerNum,
+    timestamp: Date.now()
+  });
+}
+
+function handlePlayerQuit(ws, data) {
+  const playerData = playerInfo.get(ws);
+
+  if (!playerData) {
+    console.error('❌ Quit from unknown player');
+    return;
+  }
+
+  const { gameId } = playerData;
+  const { playerNum } = data;
+
+  console.log(`🚪 Player ${playerNum} quit game ${gameId}`);
+
+  // Broadcast quit to all other players in the room
+  broadcastToRoom(gameId, ws, {
+    type: 'player-quit',
     playerNum,
     timestamp: Date.now()
   });

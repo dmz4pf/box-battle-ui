@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ENV } from '@/lib/env'
 
 export interface WebSocketGameMessage {
-  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size'
+  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size' | 'player-quit'
   gameId?: string
   playersInRoom?: number
   playerNum?: number
@@ -20,6 +20,7 @@ export interface UseWebSocketGameProps {
   onOpponentMove?: (lineId: string, playerNum: number) => void
   onPlayerJoined?: (playerNum: number, address: string) => void
   onPlayerLeft?: (playerNum: number, address: string) => void
+  onPlayerQuit?: (playerNum: number) => void
   onGridSizeReceived?: (gridSize: number) => void
   enabled?: boolean
 }
@@ -34,6 +35,7 @@ export function useWebSocketGame({
   onOpponentMove,
   onPlayerJoined,
   onPlayerLeft,
+  onPlayerQuit,
   onGridSizeReceived,
   enabled = true
 }: UseWebSocketGameProps) {
@@ -45,6 +47,7 @@ export function useWebSocketGame({
   const onOpponentMoveRef = useRef(onOpponentMove)
   const onPlayerJoinedRef = useRef(onPlayerJoined)
   const onPlayerLeftRef = useRef(onPlayerLeft)
+  const onPlayerQuitRef = useRef(onPlayerQuit)
   const onGridSizeReceivedRef = useRef(onGridSizeReceived)
 
   // Update refs when callbacks change
@@ -52,8 +55,9 @@ export function useWebSocketGame({
     onOpponentMoveRef.current = onOpponentMove
     onPlayerJoinedRef.current = onPlayerJoined
     onPlayerLeftRef.current = onPlayerLeft
+    onPlayerQuitRef.current = onPlayerQuit
     onGridSizeReceivedRef.current = onGridSizeReceived
-  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onGridSizeReceived])
+  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onPlayerQuit, onGridSizeReceived])
 
   // Send move to opponent via WebSocket
   const sendMove = useCallback((lineId: string) => {
@@ -69,6 +73,23 @@ export function useWebSocketGame({
     }
 
     console.log('[WebSocket] Sending move:', message)
+    ws.current.send(JSON.stringify(message))
+    return true
+  }, [playerNum])
+
+  // Send quit notification to opponent
+  const sendQuit = useCallback(() => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] Cannot send quit - not connected')
+      return false
+    }
+
+    const message = {
+      type: 'player-quit',
+      playerNum
+    }
+
+    console.log('[WebSocket] Sending quit notification:', message)
     ws.current.send(JSON.stringify(message))
     return true
   }, [playerNum])
@@ -148,6 +169,13 @@ export function useWebSocketGame({
             }
             break
 
+          case 'player-quit':
+            console.log(`[WebSocket] Player ${message.playerNum} quit the game`)
+            if (onPlayerQuitRef.current && message.playerNum) {
+              onPlayerQuitRef.current(message.playerNum)
+            }
+            break
+
           default:
             console.warn('[WebSocket] Unknown message type:', message)
         }
@@ -179,6 +207,7 @@ export function useWebSocketGame({
   return {
     isConnected,
     error,
-    sendMove
+    sendMove,
+    sendQuit
   }
 }
