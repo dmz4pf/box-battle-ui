@@ -259,12 +259,18 @@ export function useWatchLinePlaced(
 }
 
 export function useWatchGameCreated(onGameCreated: (log: any) => void) {
+  console.log('[useWatchGameCreated] Setting up event watcher')
+  console.log('[useWatchGameCreated] Contract address:', GAME_CONTRACT_ADDRESS)
+  console.log('[useWatchGameCreated] Event name: GameCreated')
+
   useWatchContractEvent({
     address: GAME_CONTRACT_ADDRESS,
     abi: GAME_CONTRACT_ABI,
     eventName: 'GameCreated',
     onLogs: (logs) => {
+      console.log('[useWatchGameCreated] Received logs:', logs.length)
       logs.forEach((log) => {
+        console.log('[useWatchGameCreated] Log args:', log.args)
         onGameCreated(log.args)
       })
     },

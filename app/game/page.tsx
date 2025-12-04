@@ -161,11 +161,18 @@ export default function GamePage() {
     hash: createTxHash,
   })
 
+  console.log('[Receipt Watcher] createTxHash:', createTxHash)
+  console.log('[Receipt Watcher] isTxPending:', isTxPending)
+  console.log('[Receipt Watcher] isTxConfirmed:', isTxConfirmed)
+  console.log('[Receipt Watcher] txReceipt:', txReceipt)
 
   // Extract gameId from transaction receipt
   useEffect(() => {
+    console.log('[Receipt Effect] Running with:', { isTxConfirmed, hasReceipt: !!txReceipt, hasGameId: !!gameId })
+
     if (isTxConfirmed && txReceipt && !gameId) {
-      console.log('[Transaction Confirmed]', txReceipt)
+      console.log('[Transaction Confirmed] Receipt:', txReceipt)
+      console.log('[Transaction Confirmed] Logs count:', txReceipt.logs.length)
 
       // Find the GameCreated event in the logs
       const gameCreatedLog = txReceipt.logs.find((log) => {
@@ -175,13 +182,16 @@ export default function GamePage() {
             data: log.data,
             topics: log.topics,
           })
+          console.log('[Log Decode] Found event:', decoded.eventName)
           return decoded.eventName === 'GameCreated'
-        } catch {
+        } catch (e) {
+          console.log('[Log Decode] Failed to decode log, skipping')
           return false
         }
       })
 
       if (gameCreatedLog) {
+        console.log('[Transaction Confirmed] Found GameCreated log!')
         const decoded = decodeEventLog({
           abi: GAME_CONTRACT_ABI,
           data: gameCreatedLog.data,
@@ -190,8 +200,11 @@ export default function GamePage() {
 
         const extractedGameId = decoded.args.gameId
         console.log('[GameCreated from receipt] Game ID:', extractedGameId)
+        console.log('[GameCreated from receipt] Setting gameId and transitioning to lobby')
         setGameId(extractedGameId)
         setGamePhase("lobby")
+      } else {
+        console.error('[Transaction Confirmed] NO GameCreated event found in transaction logs!')
       }
     }
   }, [isTxConfirmed, txReceipt, gameId])
