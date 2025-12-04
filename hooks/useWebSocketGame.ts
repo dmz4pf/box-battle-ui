@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { ENV } from '@/lib/env'
 
 export interface WebSocketGameMessage {
   type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left'
@@ -20,7 +21,7 @@ export interface UseWebSocketGameProps {
   enabled?: boolean
 }
 
-const WS_URL = 'ws://localhost:8080'
+const WS_URL = ENV.WS_URL
 
 export function useWebSocketGame({
   gameId,

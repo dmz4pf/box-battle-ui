@@ -99,9 +99,9 @@ export default function Navigation() {
       {showConnectModal && (
         <div
           ref={modalBackdropRef}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-modal-backdrop flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={handleCloseModal}
-          style={{ opacity: 0 }}
+          style={{ opacity: 0, zIndex: 9999 }}
         >
           <div
             ref={modalContentRef}
