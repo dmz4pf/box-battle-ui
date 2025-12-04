@@ -1,6 +1,6 @@
 "use client"
 
-import { Volume2, Settings, Wallet, Clock, CheckCircle2, X } from "lucide-react"
+import { Volume2, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft } from "lucide-react"
 import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
 import { useState, useRef, useEffect } from "react"
 import { gsap } from "gsap"
@@ -8,9 +8,12 @@ import { animateModalEnter, animateModalExit } from "@/lib/animations"
 
 interface HeaderProps {
   timer: number
+  onBack?: () => void
+  showBackButton?: boolean
+  gameMode?: "ai" | "multiplayer" | null
 }
 
-export default function Header({ timer }: HeaderProps) {
+export default function Header({ timer, onBack, showBackButton, gameMode }: HeaderProps) {
   const minutes = Math.floor(timer / 60)
   const seconds = timer % 60
   const { address, isConnected } = useAccount()
@@ -52,6 +55,14 @@ export default function Header({ timer }: HeaderProps) {
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo & Title */}
         <div className="flex items-center gap-3">
+          {showBackButton && onBack && gameMode === "ai" && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--color-text-tertiary)] hover:text-white hover:bg-bg-elevated transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
           <img
             src="/boxbattle-logo.svg"
             alt="BoxBattle"

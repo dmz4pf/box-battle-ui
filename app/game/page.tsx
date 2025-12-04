@@ -708,7 +708,12 @@ export default function GamePage() {
         backgroundSize: '100% 100%, 40px 40px, 40px 40px',
       }}
     >
-      <Header timer={timer} gameMode={gameMode} />
+      <Header
+        timer={timer}
+        gameMode={gameMode}
+        showBackButton={gamePhase === "playing"}
+        onBack={handleReset}
+      />
 
       {/* Player Stats Bar - Completely Redesigned */}
       <div className="px-8 py-4">

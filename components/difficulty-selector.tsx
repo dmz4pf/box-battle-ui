@@ -86,14 +86,26 @@ export default function DifficultySelector({
               <button
                 key={size}
                 onClick={() => onGridSizeChange(size)}
-                className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                className={`py-3 px-4 rounded-lg font-semibold transition-all relative ${
                   gridSize === size
-                    ? "bg-accent-blue text-bg-primary shadow-lg border-2 border-accent-blue"
-                    : "bg-bg-elevated text-[var(--color-text-secondary)] hover:bg-bg-elevated/80"
+                    ? "bg-accent-blue text-white shadow-xl border-2 border-accent-blue"
+                    : "bg-bg-elevated text-[var(--color-text-secondary)] hover:bg-bg-elevated/80 border-2 border-transparent"
                 }`}
+                style={
+                  gridSize === size
+                    ? {
+                        boxShadow: '0 0 20px rgba(59, 130, 246, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)',
+                        background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                      }
+                    : {}
+                }
               >
-                <div className="text-xl font-bold">{size}×{size}</div>
-                <div className="text-xs mt-1">{(size-1)*(size-1)} boxes</div>
+                <div className={`text-xl font-bold ${gridSize === size ? 'text-white' : ''}`}>
+                  {size}×{size}
+                </div>
+                <div className={`text-xs mt-1 ${gridSize === size ? 'text-white/90' : ''}`}>
+                  {(size-1)*(size-1)} boxes
+                </div>
               </button>
             ))}
           </div>
