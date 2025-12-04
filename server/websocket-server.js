@@ -51,12 +51,12 @@ wss.on('connection', (ws) => {
 });
 
 function handleJoinGame(ws, data) {
-  const { gameId, address, playerNum } = data;
+  const { gameId, address, playerNum, gridSize } = data;
 
-  console.log(`🎮 Player ${playerNum} (${address}) joining game ${gameId}`);
+  console.log(`🎮 Player ${playerNum} (${address}) joining game ${gameId} with gridSize ${gridSize}`);
 
-  // Store player info
-  playerInfo.set(ws, { gameId, address, playerNum });
+  // Store player info (including gridSize for Player 1)
+  playerInfo.set(ws, { gameId, address, playerNum, gridSize });
 
   // Add player to game room
   if (!gameRooms.has(gameId)) {
@@ -70,6 +70,25 @@ function handleJoinGame(ws, data) {
     gameId,
     playersInRoom: gameRooms.get(gameId).size
   }));
+
+  // If Player 2 is joining, send them Player 1's grid size
+  if (playerNum === 2) {
+    // Find Player 1's grid size
+    let player1GridSize = 5; // Default
+    gameRooms.get(gameId).forEach((clientWs) => {
+      const clientData = playerInfo.get(clientWs);
+      if (clientData && clientData.playerNum === 1 && clientData.gridSize) {
+        player1GridSize = clientData.gridSize;
+      }
+    });
+
+    // Send grid size to Player 2
+    ws.send(JSON.stringify({
+      type: 'grid-size',
+      gridSize: player1GridSize
+    }));
+    console.log(`📏 Sent grid size ${player1GridSize} to Player 2`);
+  }
 
   // Notify other players in the room
   broadcastToRoom(gameId, ws, {

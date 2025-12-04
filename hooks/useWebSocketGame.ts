@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ENV } from '@/lib/env'
 
 export interface WebSocketGameMessage {
-  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left'
+  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size'
   gameId?: string
   playersInRoom?: number
   playerNum?: number
   address?: string
   lineId?: string
+  gridSize?: number
   timestamp?: number
 }
 
@@ -15,9 +16,11 @@ export interface UseWebSocketGameProps {
   gameId?: bigint
   playerAddress?: string
   playerNum?: number
+  gridSize?: number
   onOpponentMove?: (lineId: string, playerNum: number) => void
   onPlayerJoined?: (playerNum: number, address: string) => void
   onPlayerLeft?: (playerNum: number, address: string) => void
+  onGridSizeReceived?: (gridSize: number) => void
   enabled?: boolean
 }
 
@@ -27,9 +30,11 @@ export function useWebSocketGame({
   gameId,
   playerAddress,
   playerNum,
+  gridSize,
   onOpponentMove,
   onPlayerJoined,
   onPlayerLeft,
+  onGridSizeReceived,
   enabled = true
 }: UseWebSocketGameProps) {
   const ws = useRef<WebSocket | null>(null)
@@ -40,13 +45,15 @@ export function useWebSocketGame({
   const onOpponentMoveRef = useRef(onOpponentMove)
   const onPlayerJoinedRef = useRef(onPlayerJoined)
   const onPlayerLeftRef = useRef(onPlayerLeft)
+  const onGridSizeReceivedRef = useRef(onGridSizeReceived)
 
   // Update refs when callbacks change
   useEffect(() => {
     onOpponentMoveRef.current = onOpponentMove
     onPlayerJoinedRef.current = onPlayerJoined
     onPlayerLeftRef.current = onPlayerLeft
-  }, [onOpponentMove, onPlayerJoined, onPlayerLeft])
+    onGridSizeReceivedRef.current = onGridSizeReceived
+  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onGridSizeReceived])
 
   // Send move to opponent via WebSocket
   const sendMove = useCallback((lineId: string) => {
@@ -94,7 +101,8 @@ export function useWebSocketGame({
         type: 'join',
         gameId: gameId.toString(),
         address: playerAddress,
-        playerNum
+        playerNum,
+        gridSize: gridSize || 5 // Send grid size (Player 1's selection)
       }
 
       console.log('[WebSocket] Joining game room:', joinMessage)
@@ -130,6 +138,13 @@ export function useWebSocketGame({
             console.log(`[WebSocket] Player ${message.playerNum} left`)
             if (onPlayerLeftRef.current && message.playerNum && message.address) {
               onPlayerLeftRef.current(message.playerNum, message.address)
+            }
+            break
+
+          case 'grid-size':
+            console.log(`[WebSocket] Received grid size: ${message.gridSize}`)
+            if (onGridSizeReceivedRef.current && message.gridSize) {
+              onGridSizeReceivedRef.current(message.gridSize)
             }
             break
 

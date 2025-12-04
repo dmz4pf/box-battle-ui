@@ -91,7 +91,13 @@ export default function GamePage() {
     gameId,
     playerAddress: address,
     playerNum,
+    gridSize,
     enabled: gameMode === "multiplayer" && (gamePhase === "playing" || gamePhase === "lobby"),
+    onGridSizeReceived: (receivedGridSize) => {
+      // Player 2 receives grid size from Player 1
+      console.log(`[Player 2] Received grid size from Player 1: ${receivedGridSize}`)
+      setGridSize(receivedGridSize as 3 | 4 | 5 | 6)
+    },
     onOpponentMove: (lineId, opponentPlayerNum) => {
       // Opponent move received
 
