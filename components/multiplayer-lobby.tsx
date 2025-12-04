@@ -211,23 +211,28 @@ export default function MultiplayerLobby({
 
               {/* Grid Size Selector */}
               <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                   <Grid3x3 className="w-5 h-5 text-accent-blue" />
                   <h4 className="text-sm font-semibold text-white">Select Grid Size</h4>
                 </div>
-                <div className="grid grid-cols-4 gap-3">
-                  {[3, 4, 5, 6].map((size) => (
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { size: 3, color: 'from-green-500 to-emerald-600', boxes: 4 },
+                    { size: 4, color: 'from-blue-500 to-cyan-600', boxes: 9 },
+                    { size: 5, color: 'from-yellow-500 to-orange-500', boxes: 16 },
+                    { size: 6, color: 'from-red-500 to-pink-600', boxes: 25 }
+                  ].map((item) => (
                     <button
-                      key={size}
-                      onClick={() => onGridSizeChange(size)}
-                      className={`py-3 px-4 rounded-lg font-semibold transition-all ${
-                        gridSize === size
-                          ? "bg-accent-blue text-white shadow-lg shadow-accent-blue/50 border-2 border-accent-blue"
-                          : "bg-bg-elevated border-2 border-transparent text-[var(--color-text-secondary)] hover:border-accent-blue/50"
+                      key={item.size}
+                      onClick={() => onGridSizeChange(item.size)}
+                      className={`p-4 rounded-xl font-semibold transition-all ${
+                        gridSize === item.size
+                          ? `bg-gradient-to-r ${item.color} text-white shadow-lg border-2 border-white/30`
+                          : "bg-bg-elevated border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-accent-blue/50"
                       }`}
                     >
-                      <div className="text-xl font-bold">{size}×{size}</div>
-                      <div className="text-xs mt-1">{(size-1)*(size-1)} boxes</div>
+                      <div className="text-2xl font-bold">{item.size}×{item.size}</div>
+                      <div className="text-sm mt-1 opacity-90">{item.boxes} boxes</div>
                     </button>
                   ))}
                 </div>
