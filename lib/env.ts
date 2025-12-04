@@ -10,9 +10,9 @@ export const ENV = {
   // WebSocket URL - auto-detect based on environment
   WS_URL: process.env.NEXT_PUBLIC_WS_URL || (
     typeof window !== 'undefined'
-      ? window.location.protocol === 'https:'
-        ? `wss://${window.location.host}/ws`
-        : 'ws://localhost:8080'
+      ? window.location.hostname === 'localhost'
+        ? 'ws://localhost:8080'
+        : 'wss://box-battle-ui-production.up.railway.app'
       : 'ws://localhost:8080'
   ),
 
