@@ -199,11 +199,11 @@ export default function GamePage() {
   // Watch blockchain events
   useWatchGameCreated((event) => {
     console.log('[GameCreated Event]', event)
-    console.log('[GameCreated] Creator:', event.creator)
+    console.log('[GameCreated] Player1:', event.player1)
     console.log('[GameCreated] Current address:', address)
     console.log('[GameCreated] Game ID:', event.gameId)
 
-    if (event.creator.toLowerCase() === address?.toLowerCase()) {
+    if (event.player1?.toLowerCase() === address?.toLowerCase()) {
       console.log('[GameCreated] This is my game! Setting gameId:', event.gameId)
       setGameId(event.gameId)
     } else {
