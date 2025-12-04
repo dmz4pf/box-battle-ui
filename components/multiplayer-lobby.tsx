@@ -64,7 +64,6 @@ export default function MultiplayerLobby({
 
   // Show waiting screen for Player 2 (joining)
   if (isJoining && createdGameId !== undefined) {
-    console.log('[MultiplayerLobby] Player 2 - Waiting for game to start')
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
@@ -85,7 +84,6 @@ export default function MultiplayerLobby({
 
   // Show waiting screen for Player 1 (created game)
   if (isWaitingForOpponent && createdGameId !== undefined && !isJoining) {
-    console.log('[MultiplayerLobby] Player 1 - Showing waiting screen. Game ID:', createdGameId)
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
@@ -143,10 +141,6 @@ export default function MultiplayerLobby({
       </div>
     )
   }
-
-  console.log('[MultiplayerLobby] Showing create/join tabs')
-  console.log('[MultiplayerLobby] Current chain:', chain?.name, 'ID:', chain?.id)
-  console.log('[MultiplayerLobby] Is on Somnia?', isOnSomniaTestnet)
 
   return (
     <div className="min-h-screen bg-bg-primary p-6">
@@ -228,8 +222,8 @@ export default function MultiplayerLobby({
                       onClick={() => onGridSizeChange(size)}
                       className={`py-3 px-4 rounded-lg font-semibold transition-all ${
                         gridSize === size
-                          ? "bg-accent-blue text-bg-primary shadow-lg"
-                          : "bg-bg-elevated border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-accent-blue"
+                          ? "bg-accent-blue text-white shadow-lg shadow-accent-blue/50 border-2 border-accent-blue"
+                          : "bg-bg-elevated border-2 border-transparent text-[var(--color-text-secondary)] hover:border-accent-blue/50"
                       }`}
                     >
                       <div className="text-xl font-bold">{size}×{size}</div>
@@ -264,7 +258,7 @@ export default function MultiplayerLobby({
                     alert('⚠️ Please switch to Somnia Testnet first!')
                     return
                   }
-                  console.log('[Lobby] Create Game button clicked')
+                  // Creating game
                   onCreateGame()
                 }}
                 disabled={!isOnSomniaTestnet}

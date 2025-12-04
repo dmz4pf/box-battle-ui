@@ -93,19 +93,19 @@ export default function GamePage() {
     playerNum,
     enabled: gameMode === "multiplayer" && (gamePhase === "playing" || gamePhase === "lobby"),
     onOpponentMove: (lineId, opponentPlayerNum) => {
-      console.log('[WebSocket] 📥 Opponent move received:', lineId, 'from player', opponentPlayerNum)
+      // Opponent move received
 
       // Add the line immediately (this updates both players' screens)
       setDrawnLines((prev) => {
         const updated = new Set(prev)
         updated.add(lineId)
-        console.log('[WebSocket] Updated drawn lines, total:', updated.size + 1)
+        // Updated drawn lines
 
         // Check if opponent completed a box with this move
         const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, updated)
 
         if (boxesCompleted > 0) {
-          console.log('[WebSocket] 📥 Opponent completed', boxesCompleted, 'box(es) - they keep turn')
+          // Opponent completed box(es)
           // Opponent keeps turn, don't switch
           setScores((prevScores) => ({
             ...prevScores,
@@ -113,7 +113,7 @@ export default function GamePage() {
           }))
           setCompletedBoxes(newBoxes)
         } else {
-          console.log('[WebSocket] 📥 Opponent passed turn - now it\'s MY turn!')
+          // Switch turn to local player
           // Opponent didn't complete a box, switch to my turn
           setCurrentPlayer(opponentPlayerNum === 1 ? "player2" : "player1")
         }
@@ -122,7 +122,7 @@ export default function GamePage() {
       })
     },
     onPlayerJoined: (joinedPlayerNum, joinedAddress) => {
-      console.log('[WebSocket] 🎮 Player', joinedPlayerNum, 'joined:', joinedAddress)
+      // Player joined game
 
       // Store player addresses
       if (joinedPlayerNum === 1) {
@@ -139,7 +139,7 @@ export default function GamePage() {
 
       // If I'm Player 1 and Player 2 just joined, start the game!
       if (playerNum === 1 && joinedPlayerNum === 2 && gamePhase === "lobby") {
-        console.log('[WebSocket] Player 2 joined! Starting game...')
+        // Player 2 joined, starting game
         // Set my own address as Player 1
         if (address) {
           setPlayer1Address(address)
@@ -154,7 +154,7 @@ export default function GamePage() {
       }
     },
     onPlayerLeft: (leftPlayerNum, leftAddress) => {
-      console.log('[WebSocket] 👋 Player', leftPlayerNum, 'left:', leftAddress)
+      // Player left game
       alert(`Player ${leftPlayerNum} left the game!`)
     }
   })
@@ -164,86 +164,43 @@ export default function GamePage() {
     hash: createTxHash,
   })
 
-  console.log('[Receipt Watcher] createTxHash:', createTxHash)
-  console.log('[Receipt Watcher] isTxPending:', isTxPending)
-  console.log('[Receipt Watcher] isTxConfirmed:', isTxConfirmed)
-  console.log('[Receipt Watcher] isTxError:', isTxError)
-  console.log('[Receipt Watcher] txReceipt:', txReceipt)
+  // Transaction receipt watcher logs removed for production
 
   // Fallback: Use game counter when receipt fails
   const { data: gameCounter } = useGameCounter()
 
   // Extract gameId from transaction receipt OR use counter fallback
   useEffect(() => {
-    console.log('[Receipt Effect] Running with:', { isTxConfirmed, isTxError, hasReceipt: !!txReceipt, hasGameId: !!gameId, gameCounter: gameCounter?.toString() })
-
     // If receipt parsing succeeds, use it
     if (isTxConfirmed && txReceipt && !gameId) {
-      console.log('[Transaction Confirmed] Receipt:', txReceipt)
-      console.log('[Transaction Confirmed] Logs count:', txReceipt.logs.length)
-      console.log('[Transaction Confirmed] Receipt status:', txReceipt.status)
-
-      // Log all raw logs to see what we have
-      txReceipt.logs.forEach((log, index) => {
-        console.log(`[Log ${index}]`, {
-          address: log.address,
-          topics: log.topics,
-          data: log.data
-        })
-      })
-
       // GameCreated event signature hash
       const gameCreatedTopic = '0xc3e0f84839dc888c892a013d10c8f9d6dc05a21a879d0ce468ca558013e9121c'
 
       // Find the GameCreated event in the logs
       const gameCreatedLog = txReceipt.logs.find((log) => {
-        // First check if log is from our contract
-        if (log.address.toLowerCase() !== GAME_CONTRACT_ADDRESS.toLowerCase()) {
-          console.log('[Log Filter] Skipping log from different contract:', log.address)
-          return false
-        }
-
-        // Check if this is a GameCreated event by topic signature
-        if (log.topics[0] === gameCreatedTopic) {
-          console.log('[Log Filter] Found GameCreated event by topic signature!')
-          return true
-        }
-
-        return false
+        // Check if log is from our contract and is GameCreated event
+        return log.address.toLowerCase() === GAME_CONTRACT_ADDRESS.toLowerCase() &&
+               log.topics[0] === gameCreatedTopic
       })
 
       if (gameCreatedLog) {
-        console.log('[Transaction Confirmed] Found GameCreated log!')
-        console.log('[Transaction Confirmed] Log topics:', gameCreatedLog.topics)
-
         // Manually extract gameId from topics[1] (it's indexed so it's in topics, not data)
         // Topics: [signature, gameId, player1Address]
         const gameIdHex = gameCreatedLog.topics[1]
         const extractedGameId = BigInt(gameIdHex)
 
-        console.log('[GameCreated from receipt] Game ID (hex):', gameIdHex)
-        console.log('[GameCreated from receipt] Game ID (decimal):', extractedGameId.toString())
-        console.log('[GameCreated from receipt] Setting gameId and transitioning to lobby')
-
         setGameId(extractedGameId)
         setGamePhase("lobby")
       } else {
-        console.error('[Transaction Confirmed] NO GameCreated event found in transaction logs!')
-        console.error('[Transaction Confirmed] This might mean the transaction reverted or contract address is wrong')
-        console.error('[Transaction Confirmed] Contract address we are watching:', GAME_CONTRACT_ADDRESS)
+        console.error('[Game] NO GameCreated event found - transaction may have reverted')
       }
     }
 
     // Fallback: If receipt times out but we have a hash and game counter, use counter
     if (createTxHash && !gameId && !isTxPending && !isTxConfirmed && gameCounter) {
-      console.log('[Fallback] Receipt timed out, using game counter as fallback')
-      console.log('[Fallback] Game counter:', gameCounter.toString())
-      console.log('[Fallback] Assuming this is the game we just created')
-
       // Wait a bit to ensure transaction is mined
       setTimeout(() => {
         if (!gameId) { // Double check we haven't gotten it another way
-          console.log('[Fallback] Setting gameId to counter:', gameCounter.toString())
           setGameId(gameCounter)
           setGamePhase("lobby")
         }
@@ -586,7 +543,6 @@ export default function GamePage() {
         setCompletedBoxes(newBoxes)
 
         if (boxesCompleted > 0) {
-          console.log('[Multiplayer] ✅ Completed', boxesCompleted, 'box(es) - keeping turn')
           // Play box complete sound
           playBoxComplete()
           // Update my score
@@ -597,7 +553,6 @@ export default function GamePage() {
           setMoveHistory((prev) => [...prev.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
           // Keep current turn, don't switch
         } else {
-          console.log('[Multiplayer] ⏭️ Passing turn to opponent')
           // Switch turns
           setCurrentPlayer(currentPlayer === "player1" ? "player2" : "player1")
           setMoveHistory((prev) => [...prev.slice(-2), "Turn passed to opponent"])
@@ -670,8 +625,7 @@ export default function GamePage() {
   }
 
   const handleCreateGame = () => {
-    console.log('[GamePage] handleCreateGame called')
-    console.log('[GamePage] createGame function:', createGame)
+    // Creating game
     // Set my address as Player 1
     if (address) {
       setPlayer1Address(address)
@@ -680,14 +634,14 @@ export default function GamePage() {
   }
 
   const handleJoinGame = (gameIdToJoin: bigint) => {
-    console.log('[JoinGame] Joining game with ID:', gameIdToJoin)
+    // Joining game
     setGameId(gameIdToJoin)
     setIsJoiningGame(true)
     // Set my address as Player 2
     if (address) {
       setPlayer2Address(address)
     }
-    console.log('[JoinGame] Calling joinGame function...')
+    // Calling join game transaction
     joinGame(gameIdToJoin)
   }
 
@@ -695,10 +649,8 @@ export default function GamePage() {
   // Watch for successful game join - transition to playing after a delay
   useEffect(() => {
     if (gameJoined && gameId && gameMode === "multiplayer") {
-      console.log('[GameJoined] Player 2 joined successfully. Waiting for GameStarted event...')
       // Stay in lobby briefly, then check if we should auto-start
       setTimeout(() => {
-        console.log('[GameJoined] Timeout - force transition to playing')
         setGamePhase("playing")
         // Set my address as Player 2 again in case it wasn't set
         if (address) {

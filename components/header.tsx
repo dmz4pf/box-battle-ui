@@ -1,11 +1,11 @@
 "use client"
 
-import { Volume2, VolumeX, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft } from "lucide-react"
+import { Volume2, VolumeX, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft, Music, Gamepad2 } from "lucide-react"
 import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
 import { useState, useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { animateModalEnter, animateModalExit } from "@/lib/animations"
-import { useBackgroundMusic } from "@/hooks/useSound"
+import { useBackgroundMusic, useSoundEffects } from "@/hooks/useSound"
 
 interface HeaderProps {
   timer: number
@@ -27,7 +27,24 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
   const modalContentRef = useRef<HTMLDivElement>(null)
 
   // Sound controls
-  const { isMuted, toggleMute } = useBackgroundMusic()
+  const { isMuted: isMusicMuted, toggleMute: toggleMusic } = useBackgroundMusic()
+  const { isMuted: isSfxMuted, toggleMute: toggleSfx } = useSoundEffects()
+  const [showSoundMenu, setShowSoundMenu] = useState(false)
+  const soundMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close sound menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (soundMenuRef.current && !soundMenuRef.current.contains(event.target as Node)) {
+        setShowSoundMenu(false)
+      }
+    }
+
+    if (showSoundMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSoundMenu])
 
   // Animate modal on mount/unmount
   useEffect(() => {
@@ -106,18 +123,67 @@ export default function Header({ timer, onBack, showBackButton, gameMode }: Head
             </span>
           </div>
 
-          {/* Sound Toggle */}
-          <button
-            onClick={toggleMute}
-            className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
-            aria-label="Toggle sound"
-          >
-            {isMuted ? (
-              <VolumeX className="w-5 h-5" />
-            ) : (
-              <Volume2 className="w-5 h-5" />
+          {/* Sound Menu */}
+          <div className="relative" ref={soundMenuRef}>
+            <button
+              onClick={() => setShowSoundMenu(!showSoundMenu)}
+              className="p-2 hover:bg-bg-elevated rounded-lg transition-colors duration-200 text-[var(--color-text-tertiary)] hover:text-white"
+              aria-label="Sound settings"
+            >
+              {isMusicMuted && isSfxMuted ? (
+                <VolumeX className="w-5 h-5" />
+              ) : (
+                <Volume2 className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Sound Dropdown Menu */}
+            {showSoundMenu && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-bg-panel border border-[var(--color-border)] rounded-lg shadow-lg p-4 z-50">
+                <h3 className="text-sm font-semibold text-white mb-3">Sound Settings</h3>
+
+                {/* Background Music Toggle */}
+                <div className="flex items-center justify-between mb-3 p-2 hover:bg-bg-elevated rounded-lg transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-4 h-4 text-accent-blue" />
+                    <span className="text-sm text-[var(--color-text-secondary)]">Background Music</span>
+                  </div>
+                  <button
+                    onClick={toggleMusic}
+                    className={`w-10 h-6 rounded-full transition-colors duration-200 flex items-center ${
+                      isMusicMuted ? 'bg-bg-elevated' : 'bg-accent-blue'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${
+                        isMusicMuted ? 'translate-x-1' : 'translate-x-5'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Sound Effects Toggle */}
+                <div className="flex items-center justify-between p-2 hover:bg-bg-elevated rounded-lg transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Gamepad2 className="w-4 h-4 text-accent-purple" />
+                    <span className="text-sm text-[var(--color-text-secondary)]">Sound Effects</span>
+                  </div>
+                  <button
+                    onClick={toggleSfx}
+                    className={`w-10 h-6 rounded-full transition-colors duration-200 flex items-center ${
+                      isSfxMuted ? 'bg-bg-elevated' : 'bg-accent-blue'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${
+                        isSfxMuted ? 'translate-x-1' : 'translate-x-5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
