@@ -191,6 +191,9 @@ export default function GamePage() {
         })
       })
 
+      // GameCreated event signature hash
+      const gameCreatedTopic = '0xc3e0f84839dc888c892a013d10c8f9d6dc05a21a879d0ce468ca558013e9121c'
+
       // Find the GameCreated event in the logs
       const gameCreatedLog = txReceipt.logs.find((log) => {
         // First check if log is from our contract
@@ -199,31 +202,28 @@ export default function GamePage() {
           return false
         }
 
-        try {
-          const decoded = decodeEventLog({
-            abi: GAME_CONTRACT_ABI,
-            data: log.data,
-            topics: log.topics,
-          })
-          console.log('[Log Decode] Found event:', decoded.eventName, 'args:', decoded.args)
-          return decoded.eventName === 'GameCreated'
-        } catch (e) {
-          console.log('[Log Decode] Failed to decode log:', e)
-          return false
+        // Check if this is a GameCreated event by topic signature
+        if (log.topics[0] === gameCreatedTopic) {
+          console.log('[Log Filter] Found GameCreated event by topic signature!')
+          return true
         }
+
+        return false
       })
 
       if (gameCreatedLog) {
         console.log('[Transaction Confirmed] Found GameCreated log!')
-        const decoded = decodeEventLog({
-          abi: GAME_CONTRACT_ABI,
-          data: gameCreatedLog.data,
-          topics: gameCreatedLog.topics,
-        }) as any
+        console.log('[Transaction Confirmed] Log topics:', gameCreatedLog.topics)
 
-        const extractedGameId = decoded.args.gameId
-        console.log('[GameCreated from receipt] Game ID:', extractedGameId)
+        // Manually extract gameId from topics[1] (it's indexed so it's in topics, not data)
+        // Topics: [signature, gameId, player1Address]
+        const gameIdHex = gameCreatedLog.topics[1]
+        const extractedGameId = BigInt(gameIdHex)
+
+        console.log('[GameCreated from receipt] Game ID (hex):', gameIdHex)
+        console.log('[GameCreated from receipt] Game ID (decimal):', extractedGameId.toString())
         console.log('[GameCreated from receipt] Setting gameId and transitioning to lobby')
+
         setGameId(extractedGameId)
         setGamePhase("lobby")
       } else {
