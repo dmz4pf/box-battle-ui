@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ENV } from '@/lib/env'
 
 export interface WebSocketGameMessage {
-  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size' | 'player-quit'
+  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size' | 'player-quit' | 'play-again-request' | 'play-again-response'
   gameId?: string
   playersInRoom?: number
   playerNum?: number
@@ -10,6 +10,7 @@ export interface WebSocketGameMessage {
   lineId?: string
   gridSize?: number
   timestamp?: number
+  accepted?: boolean
 }
 
 export interface UseWebSocketGameProps {
@@ -22,6 +23,8 @@ export interface UseWebSocketGameProps {
   onPlayerLeft?: (playerNum: number, address: string) => void
   onPlayerQuit?: (playerNum: number) => void
   onGridSizeReceived?: (gridSize: number) => void
+  onPlayAgainRequest?: (playerNum: number) => void
+  onPlayAgainResponse?: (accepted: boolean) => void
   enabled?: boolean
 }
 
@@ -37,6 +40,8 @@ export function useWebSocketGame({
   onPlayerLeft,
   onPlayerQuit,
   onGridSizeReceived,
+  onPlayAgainRequest,
+  onPlayAgainResponse,
   enabled = true
 }: UseWebSocketGameProps) {
   const ws = useRef<WebSocket | null>(null)
@@ -49,6 +54,8 @@ export function useWebSocketGame({
   const onPlayerLeftRef = useRef(onPlayerLeft)
   const onPlayerQuitRef = useRef(onPlayerQuit)
   const onGridSizeReceivedRef = useRef(onGridSizeReceived)
+  const onPlayAgainRequestRef = useRef(onPlayAgainRequest)
+  const onPlayAgainResponseRef = useRef(onPlayAgainResponse)
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -57,7 +64,9 @@ export function useWebSocketGame({
     onPlayerLeftRef.current = onPlayerLeft
     onPlayerQuitRef.current = onPlayerQuit
     onGridSizeReceivedRef.current = onGridSizeReceived
-  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onPlayerQuit, onGridSizeReceived])
+    onPlayAgainRequestRef.current = onPlayAgainRequest
+    onPlayAgainResponseRef.current = onPlayAgainResponse
+  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onPlayerQuit, onGridSizeReceived, onPlayAgainRequest, onPlayAgainResponse])
 
   // Send move to opponent via WebSocket
   const sendMove = useCallback((lineId: string) => {
@@ -90,6 +99,41 @@ export function useWebSocketGame({
     }
 
     console.log('[WebSocket] Sending quit notification:', message)
+    ws.current.send(JSON.stringify(message))
+    return true
+  }, [playerNum])
+
+  // Send play again request to opponent
+  const sendPlayAgainRequest = useCallback(() => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] Cannot send play-again request - not connected')
+      return false
+    }
+
+    const message = {
+      type: 'play-again-request',
+      playerNum
+    }
+
+    console.log('[WebSocket] Sending play-again request:', message)
+    ws.current.send(JSON.stringify(message))
+    return true
+  }, [playerNum])
+
+  // Send play again response to opponent
+  const sendPlayAgainResponse = useCallback((accepted: boolean) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] Cannot send play-again response - not connected')
+      return false
+    }
+
+    const message = {
+      type: 'play-again-response',
+      playerNum,
+      accepted
+    }
+
+    console.log('[WebSocket] Sending play-again response:', message)
     ws.current.send(JSON.stringify(message))
     return true
   }, [playerNum])
@@ -176,6 +220,20 @@ export function useWebSocketGame({
             }
             break
 
+          case 'play-again-request':
+            console.log(`[WebSocket] Player ${message.playerNum} wants to play again`)
+            if (onPlayAgainRequestRef.current && message.playerNum) {
+              onPlayAgainRequestRef.current(message.playerNum)
+            }
+            break
+
+          case 'play-again-response':
+            console.log(`[WebSocket] Play again response: ${message.accepted ? 'accepted' : 'declined'}`)
+            if (onPlayAgainResponseRef.current && message.accepted !== undefined) {
+              onPlayAgainResponseRef.current(message.accepted)
+            }
+            break
+
           default:
             console.warn('[WebSocket] Unknown message type:', message)
         }
@@ -208,6 +266,8 @@ export function useWebSocketGame({
     isConnected,
     error,
     sendMove,
-    sendQuit
+    sendQuit,
+    sendPlayAgainRequest,
+    sendPlayAgainResponse
   }
 }

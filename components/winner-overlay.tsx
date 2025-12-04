@@ -153,15 +153,13 @@ export default function WinnerOverlay({
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          {gameMode === "ai" && (
-            <button
-              onClick={onPlayAgain}
-              className="button-primary w-full py-3 flex items-center justify-center gap-2"
-            >
-              <RotateCcw className="w-5 h-5" />
-              Play Again
-            </button>
-          )}
+          <button
+            onClick={onPlayAgain}
+            className="button-primary w-full py-3 flex items-center justify-center gap-2"
+          >
+            <RotateCcw className="w-5 h-5" />
+            Play Again
+          </button>
 
           <button
             onClick={onBackToMenu || onPlayAgain}

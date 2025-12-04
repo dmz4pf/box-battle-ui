@@ -70,6 +70,8 @@ export default function GamePage() {
   const [totalBoxes, setTotalBoxes] = useState((gridSize - 1) * (gridSize - 1))
   const [aiNeedsAnotherTurn, setAiNeedsAnotherTurn] = useState(false)
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
+  const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false)
+  const [playAgainRequesterNum, setPlayAgainRequesterNum] = useState<number | null>(null)
 
   // Multiplayer blockchain state
   const [gameId, setGameId] = useState<bigint | undefined>()
@@ -87,7 +89,7 @@ export default function GamePage() {
   useAutoplayMusic()
 
   // WebSocket for real-time moves (NO BLOCKCHAIN SIGNATURES!)
-  const { isConnected: wsConnected, sendMove, sendQuit } = useWebSocketGame({
+  const { isConnected: wsConnected, sendMove, sendQuit, sendPlayAgainRequest, sendPlayAgainResponse } = useWebSocketGame({
     gameId,
     playerAddress: address,
     playerNum,
@@ -183,6 +185,21 @@ export default function GamePage() {
       setTimeout(() => {
         alert(`Player ${quitPlayerNum} quit the game. You win!`)
       }, 100)
+    },
+    onPlayAgainRequest: (requesterNum) => {
+      // Opponent wants to play again
+      setPlayAgainRequesterNum(requesterNum)
+      setShowPlayAgainPrompt(true)
+    },
+    onPlayAgainResponse: (accepted) => {
+      if (accepted) {
+        // Opponent accepted! Restart the game
+        handleRestartMultiplayer()
+      } else {
+        // Opponent declined, go back to menu
+        alert("Your opponent declined. Returning to menu.")
+        handleReset()
+      }
     }
   })
 
@@ -738,6 +755,46 @@ export default function GamePage() {
     // Keep gameMode, difficulty, aiPlayer, and gridSize
   }
 
+  const handleRestartMultiplayer = () => {
+    // Restart multiplayer game (keep addresses and gameId)
+    setScores({ player1: 0, player2: 0 })
+    setWinner(null)
+    setMoveHistory([])
+    setCurrentPlayer("player1")
+    setTimer(getTimerForGridSize(gridSize))
+    setDrawnLines(new Set())
+    setCompletedBoxes(new Map())
+    setShowPlayAgainPrompt(false)
+    setPlayAgainRequesterNum(null)
+    // Keep gameMode, player addresses, gameId, and gridSize
+  }
+
+  const handleMultiplayerPlayAgain = () => {
+    // Send play again request to opponent
+    if (sendPlayAgainRequest) {
+      sendPlayAgainRequest()
+      alert("Waiting for opponent's response...")
+    }
+  }
+
+  const handleAcceptPlayAgain = () => {
+    // Accept opponent's play again request
+    if (sendPlayAgainResponse) {
+      sendPlayAgainResponse(true)
+      setShowPlayAgainPrompt(false)
+      handleRestartMultiplayer()
+    }
+  }
+
+  const handleDeclinePlayAgain = () => {
+    // Decline opponent's play again request
+    if (sendPlayAgainResponse) {
+      sendPlayAgainResponse(false)
+      setShowPlayAgainPrompt(false)
+      handleReset()
+    }
+  }
+
   // Username setup phase
   if (!playerUsername && gamePhase === "username-setup" && isConnected) {
     return <UsernameSetup onSubmit={handleUsernameSubmit} address={address || ""} />
@@ -1024,13 +1081,39 @@ export default function GamePage() {
         <WinnerOverlay
           winner={winner}
           scores={{ player1: player1Score, player2: player2Score }}
-          onPlayAgain={gameMode === "ai" ? handleRestartAI : handleReset}
+          onPlayAgain={gameMode === "ai" ? handleRestartAI : handleMultiplayerPlayAgain}
           onBackToMenu={handleReset}
           isPlayerOne={isPlayerOne}
           player1Name={player1Name}
           player2Name={player2Name}
           gameMode={gameMode || "ai"}
         />
+      )}
+
+      {/* Play Again Prompt Modal */}
+      {showPlayAgainPrompt && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-panel border-2 border-accent-blue rounded-xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-4">Play Again?</h2>
+            <p className="text-[var(--color-text-secondary)] mb-6">
+              Player {playAgainRequesterNum} wants to play another round. Do you want to join them?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeclinePlayAgain}
+                className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated transition-all duration-200"
+              >
+                Decline
+              </button>
+              <button
+                onClick={handleAcceptPlayAgain}
+                className="flex-1 button-primary"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quit Confirmation Modal */}

@@ -32,6 +32,14 @@ wss.on('connection', (ws) => {
           handlePlayerQuit(ws, data);
           break;
 
+        case 'play-again-request':
+          handlePlayAgainRequest(ws, data);
+          break;
+
+        case 'play-again-response':
+          handlePlayAgainResponse(ws, data);
+          break;
+
         case 'leave':
           handleLeaveGame(ws);
           break;
@@ -144,6 +152,49 @@ function handlePlayerQuit(ws, data) {
   broadcastToRoom(gameId, ws, {
     type: 'player-quit',
     playerNum,
+    timestamp: Date.now()
+  });
+}
+
+function handlePlayAgainRequest(ws, data) {
+  const playerData = playerInfo.get(ws);
+
+  if (!playerData) {
+    console.error('❌ Play-again request from unknown player');
+    return;
+  }
+
+  const { gameId } = playerData;
+  const { playerNum } = data;
+
+  console.log(`🔄 Player ${playerNum} requested play-again in game ${gameId}`);
+
+  // Broadcast play-again request to all other players in the room
+  broadcastToRoom(gameId, ws, {
+    type: 'play-again-request',
+    playerNum,
+    timestamp: Date.now()
+  });
+}
+
+function handlePlayAgainResponse(ws, data) {
+  const playerData = playerInfo.get(ws);
+
+  if (!playerData) {
+    console.error('❌ Play-again response from unknown player');
+    return;
+  }
+
+  const { gameId } = playerData;
+  const { playerNum, accepted } = data;
+
+  console.log(`✅ Player ${playerNum} ${accepted ? 'accepted' : 'declined'} play-again in game ${gameId}`);
+
+  // Broadcast play-again response to all other players in the room
+  broadcastToRoom(gameId, ws, {
+    type: 'play-again-response',
+    playerNum,
+    accepted,
     timestamp: Date.now()
   });
 }
