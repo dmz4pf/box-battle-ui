@@ -59,7 +59,7 @@ export default function GamePage() {
   // Game state
   const [currentPlayer, setCurrentPlayer] = useState<"player1" | "player2">("player1")
   const [scores, setScores] = useState({ player1: 0, player2: 0 })
-  const [winner, setWinner] = useState<"player1" | "player2" | null>(null)
+  const [winner, setWinner] = useState<"player1" | "player2" | "draw" | null>(null)
   const [moveHistory, setMoveHistory] = useState<string[]>([])
   const [timer, setTimer] = useState(getTimerForGridSize(gridSize))
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
@@ -72,6 +72,7 @@ export default function GamePage() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false)
   const [playAgainRequesterNum, setPlayAgainRequesterNum] = useState<number | null>(null)
+  const [waitingForPlayAgainResponse, setWaitingForPlayAgainResponse] = useState(false)
 
   // Multiplayer blockchain state
   const [gameId, setGameId] = useState<bigint | undefined>()
@@ -192,6 +193,7 @@ export default function GamePage() {
       setShowPlayAgainPrompt(true)
     },
     onPlayAgainResponse: (accepted) => {
+      setWaitingForPlayAgainResponse(false)
       if (accepted) {
         // Opponent accepted! Restart the game
         handleRestartMultiplayer()
@@ -453,19 +455,21 @@ export default function GamePage() {
       const p1Score = scores.player1
       const p2Score = scores.player2
 
-      let winningPlayer: "player1" | "player2"
+      let winningPlayer: "player1" | "player2" | "draw"
 
       if (p1Score > p2Score) {
         winningPlayer = "player1"
       } else if (p2Score > p1Score) {
         winningPlayer = "player2"
       } else {
-        // Tie: player1 wins tiebreaker
-        winningPlayer = "player1"
+        // Tie: it's a draw
+        winningPlayer = "draw"
       }
 
       // Play correct sound for each player
-      if (gameMode === "ai") {
+      if (winningPlayer === "draw") {
+        // No sound for draw
+      } else if (gameMode === "ai") {
         // AI mode: player is always player1
         if (winningPlayer === "player1") {
           playWin()
@@ -538,7 +542,14 @@ export default function GamePage() {
     const interval = setInterval(() => {
       setTimer((prev) => {
         if (prev <= 1) {
-          setWinner(scores.player1 > scores.player2 ? "player1" : "player2")
+          // Determine winner or draw when timer runs out
+          if (scores.player1 > scores.player2) {
+            setWinner("player1")
+          } else if (scores.player2 > scores.player1) {
+            setWinner("player2")
+          } else {
+            setWinner("draw")
+          }
           return 0
         }
         return prev - 1
@@ -773,7 +784,7 @@ export default function GamePage() {
     // Send play again request to opponent
     if (sendPlayAgainRequest) {
       sendPlayAgainRequest()
-      alert("Waiting for opponent's response...")
+      setWaitingForPlayAgainResponse(true)
     }
   }
 
@@ -1088,6 +1099,19 @@ export default function GamePage() {
           player2Name={player2Name}
           gameMode={gameMode || "ai"}
         />
+      )}
+
+      {/* Waiting for Play Again Response */}
+      {waitingForPlayAgainResponse && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-panel border-2 border-accent-blue rounded-xl p-8 max-w-md w-full text-center">
+            <div className="w-16 h-16 border-4 border-accent-blue border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent</h2>
+            <p className="text-[var(--color-text-secondary)]">
+              Waiting for your opponent to accept...
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Play Again Prompt Modal */}

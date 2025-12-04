@@ -5,7 +5,7 @@ import { Trophy, TrendingUp, TrendingDown, Coins, RotateCcw, Home } from "lucide
 import { gsap } from "gsap"
 
 interface WinnerOverlayProps {
-  winner: "player1" | "player2"
+  winner: "player1" | "player2" | "draw"
   scores: { player1: number; player2: number }
   onPlayAgain: () => void
   onBackToMenu?: () => void
@@ -29,13 +29,14 @@ export default function WinnerOverlay({
   const contentRef = useRef<HTMLDivElement>(null)
   const trophyRef = useRef<HTMLDivElement>(null)
 
-  const didWin = (isPlayerOne && winner === "player1") || (!isPlayerOne && winner === "player2")
-  const winnerName = winner === "player1" ? player1Name : player2Name
+  const isDraw = winner === "draw"
+  const didWin = !isDraw && ((isPlayerOne && winner === "player1") || (!isPlayerOne && winner === "player2"))
+  const winnerName = winner === "player1" ? player1Name : winner === "player2" ? player2Name : "Draw"
   const myScore = isPlayerOne ? scores.player1 : scores.player2
   const opponentScore = isPlayerOne ? scores.player2 : scores.player1
 
-  const statusColor = didWin ? 'var(--color-success)' : 'var(--color-error)'
-  const StatusIcon = didWin ? TrendingUp : TrendingDown
+  const statusColor = isDraw ? 'var(--color-text-secondary)' : (didWin ? 'var(--color-success)' : 'var(--color-error)')
+  const StatusIcon = isDraw ? Trophy : (didWin ? TrendingUp : TrendingDown)
 
   useEffect(() => {
     if (!backdropRef.current || !contentRef.current || !trophyRef.current) return
@@ -113,7 +114,7 @@ export default function WinnerOverlay({
             className="text-4xl font-black"
             style={{ color: statusColor }}
           >
-            {didWin ? "VICTORY" : "DEFEAT"}
+            {isDraw ? "DRAW" : (didWin ? "VICTORY" : "DEFEAT")}
           </h2>
           <StatusIcon
             className="w-8 h-8"
@@ -123,9 +124,11 @@ export default function WinnerOverlay({
         </div>
 
         <p className="text-[var(--color-text-secondary)] text-lg mb-8">
-          {didWin
-            ? `You defeated ${gameMode === "ai" ? "the AI" : winnerName}!`
-            : `${gameMode === "ai" ? "AI" : winnerName} won this round!`
+          {isDraw
+            ? "The game ended in a tie!"
+            : (didWin
+              ? `You defeated ${gameMode === "ai" ? "the AI" : winnerName}!`
+              : `${gameMode === "ai" ? "AI" : winnerName} won this round!`)
           }
         </p>
 
@@ -140,8 +143,8 @@ export default function WinnerOverlay({
           </p>
         </div>
 
-        {/* Prize Card (only for winner in multiplayer) */}
-        {didWin && gameMode === "multiplayer" && (
+        {/* Prize Card (only for winner in multiplayer, not for draw) */}
+        {!isDraw && didWin && gameMode === "multiplayer" && (
           <div className="card border-2 mb-8" style={{ borderColor: 'var(--color-accent-amber)' }}>
             <div className="flex items-center justify-center gap-2 mb-2">
               <Coins className="w-5 h-5 text-accent-amber" />
