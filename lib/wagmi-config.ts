@@ -124,4 +124,4 @@ export const config = createConfig({
   },
 })
 
-export const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT as `0x${string}`
+export const GAME_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_GAME_CONTRACT || '0xDB3CB1af42f41d91e06DeABA286b0918A3422dFe') as `0x${string}`
