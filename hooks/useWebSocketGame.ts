@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { ENV } from '@/lib/env'
 
 export interface WebSocketGameMessage {
-  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size' | 'player-quit' | 'play-again-request' | 'play-again-response'
+  type: 'joined' | 'player-joined' | 'opponent-move' | 'player-left' | 'grid-size' | 'player-quit' | 'play-again-request' | 'play-again-response' | 'first-turn'
   gameId?: string
   playersInRoom?: number
   playerNum?: number
@@ -11,6 +11,7 @@ export interface WebSocketGameMessage {
   gridSize?: number
   timestamp?: number
   accepted?: boolean
+  firstPlayer?: "player1" | "player2"
 }
 
 export interface UseWebSocketGameProps {
@@ -25,6 +26,7 @@ export interface UseWebSocketGameProps {
   onGridSizeReceived?: (gridSize: number) => void
   onPlayAgainRequest?: (playerNum: number) => void
   onPlayAgainResponse?: (accepted: boolean) => void
+  onFirstTurnReceived?: (firstPlayer: "player1" | "player2") => void
   enabled?: boolean
 }
 
@@ -42,6 +44,7 @@ export function useWebSocketGame({
   onGridSizeReceived,
   onPlayAgainRequest,
   onPlayAgainResponse,
+  onFirstTurnReceived,
   enabled = true
 }: UseWebSocketGameProps) {
   const ws = useRef<WebSocket | null>(null)
@@ -56,6 +59,7 @@ export function useWebSocketGame({
   const onGridSizeReceivedRef = useRef(onGridSizeReceived)
   const onPlayAgainRequestRef = useRef(onPlayAgainRequest)
   const onPlayAgainResponseRef = useRef(onPlayAgainResponse)
+  const onFirstTurnReceivedRef = useRef(onFirstTurnReceived)
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -66,7 +70,8 @@ export function useWebSocketGame({
     onGridSizeReceivedRef.current = onGridSizeReceived
     onPlayAgainRequestRef.current = onPlayAgainRequest
     onPlayAgainResponseRef.current = onPlayAgainResponse
-  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onPlayerQuit, onGridSizeReceived, onPlayAgainRequest, onPlayAgainResponse])
+    onFirstTurnReceivedRef.current = onFirstTurnReceived
+  }, [onOpponentMove, onPlayerJoined, onPlayerLeft, onPlayerQuit, onGridSizeReceived, onPlayAgainRequest, onPlayAgainResponse, onFirstTurnReceived])
 
   // Send move to opponent via WebSocket
   const sendMove = useCallback((lineId: string) => {
@@ -231,6 +236,13 @@ export function useWebSocketGame({
             console.log(`[WebSocket] Play again response: ${message.accepted ? 'accepted' : 'declined'}`)
             if (onPlayAgainResponseRef.current && message.accepted !== undefined) {
               onPlayAgainResponseRef.current(message.accepted)
+            }
+            break
+
+          case 'first-turn':
+            console.log(`[WebSocket] Received first turn: ${message.firstPlayer}`)
+            if (onFirstTurnReceivedRef.current && message.firstPlayer) {
+              onFirstTurnReceivedRef.current(message.firstPlayer)
             }
             break
 

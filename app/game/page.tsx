@@ -89,11 +89,6 @@ export default function GamePage() {
   // Autoplay background music on mount
   useAutoplayMusic()
 
-  // Random coin toss for first turn
-  const getRandomFirstPlayer = (): "player1" | "player2" => {
-    return Math.random() < 0.5 ? "player1" : "player2"
-  }
-
   // WebSocket for real-time moves (NO BLOCKCHAIN SIGNATURES!)
   const { isConnected: wsConnected, sendMove, sendQuit, sendPlayAgainRequest, sendPlayAgainResponse } = useWebSocketGame({
     gameId,
@@ -162,7 +157,7 @@ export default function GamePage() {
         setDrawnLines(new Set())
         setCompletedBoxes(new Map())
         setScores({ player1: 0, player2: 0 })
-        setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
+        // Don't set currentPlayer here - wait for WebSocket first-turn message
         setGamePhase("playing")
         refetchGame()
       }
@@ -207,6 +202,11 @@ export default function GamePage() {
         alert("Your opponent declined. Returning to menu.")
         handleReset()
       }
+    },
+    onFirstTurnReceived: (firstPlayer) => {
+      // Server determined first turn via coin toss
+      console.log(`[Game] First turn received from server: ${firstPlayer}`)
+      setCurrentPlayer(firstPlayer)
     }
   })
 
@@ -315,7 +315,7 @@ export default function GamePage() {
       setDrawnLines(new Set())
       setCompletedBoxes(new Map())
       setScores({ player1: 0, player2: 0 })
-      setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
+      // Don't set currentPlayer here - wait for WebSocket first-turn message
       setGamePhase("playing")
       refetchGame()
     } else {
@@ -776,7 +776,7 @@ export default function GamePage() {
     setScores({ player1: 0, player2: 0 })
     setWinner(null)
     setMoveHistory([])
-    setCurrentPlayer(getRandomFirstPlayer()) // Random coin toss for first turn
+    // Don't set currentPlayer here - server will send new first-turn via WebSocket
     setTimer(getTimerForGridSize(gridSize))
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())

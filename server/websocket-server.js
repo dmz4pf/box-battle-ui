@@ -83,7 +83,7 @@ function handleJoinGame(ws, data) {
     playersInRoom: gameRooms.get(gameId).size
   }));
 
-  // If Player 2 is joining, send them Player 1's grid size
+  // If Player 2 is joining, send them Player 1's grid size and determine first turn
   if (playerNum === 2) {
     // Find Player 1's grid size
     let player1GridSize = 5; // Default
@@ -100,6 +100,17 @@ function handleJoinGame(ws, data) {
       gridSize: player1GridSize
     }));
     console.log(`📏 Sent grid size ${player1GridSize} to Player 2`);
+
+    // Determine first turn randomly (50/50 coin toss)
+    const firstPlayer = Math.random() < 0.5 ? 'player1' : 'player2';
+    console.log(`🎲 Coin toss result: ${firstPlayer} goes first`);
+
+    // Broadcast first turn to BOTH players
+    broadcastToRoom(gameId, null, {
+      type: 'first-turn',
+      firstPlayer: firstPlayer,
+      timestamp: Date.now()
+    });
   }
 
   // Notify other players in the room
@@ -197,6 +208,18 @@ function handlePlayAgainResponse(ws, data) {
     accepted,
     timestamp: Date.now()
   });
+
+  // If accepted, do a new coin toss and broadcast to both players
+  if (accepted) {
+    const firstPlayer = Math.random() < 0.5 ? 'player1' : 'player2';
+    console.log(`🎲 Play-again coin toss: ${firstPlayer} goes first`);
+
+    broadcastToRoom(gameId, null, {
+      type: 'first-turn',
+      firstPlayer: firstPlayer,
+      timestamp: Date.now()
+    });
+  }
 }
 
 function handleLeaveGame(ws) {
@@ -235,7 +258,8 @@ function broadcastToRoom(gameId, senderWs, message) {
   const room = gameRooms.get(gameId);
 
   room.forEach((ws) => {
-    if (ws !== senderWs && ws.readyState === WebSocket.OPEN) {
+    // If senderWs is null, send to everyone. Otherwise, skip the sender.
+    if ((senderWs === null || ws !== senderWs) && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     }
   });

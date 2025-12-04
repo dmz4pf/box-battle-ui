@@ -7,9 +7,11 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">⚡</span>
-              </div>
+              <img
+                src="/boxbattle-logo.svg"
+                alt="BoxBattle"
+                className="w-8 h-8"
+              />
               <span className="font-bold text-white">BoxBattle</span>
             </div>
             <p className="text-slate-400 text-sm">The ultimate strategic gaming experience.</p>
