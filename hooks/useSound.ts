@@ -7,6 +7,7 @@ import {
   subscribeToBackgroundMusic,
   subscribeToSoundEffects,
   startBackgroundMusic,
+  initMusicOnInteraction,
 } from '@/lib/sounds'
 
 /**
@@ -66,6 +67,9 @@ export function useAutoplayMusic() {
   useEffect(() => {
     // Try to start music on mount
     startBackgroundMusic()
+
+    // Set up listener for first user interaction
+    initMusicOnInteraction()
 
     // Also try after a short delay (helps with some browsers)
     const timeout = setTimeout(() => {

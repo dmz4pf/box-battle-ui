@@ -7,6 +7,7 @@
 let globalAudio: HTMLAudioElement | null = null
 let globalIsMuted: boolean = false
 let listeners: Set<() => void> = new Set()
+let hasTriedAutoplay: boolean = false
 
 // Global state for sound effects
 let globalSfxMuted: boolean = false
@@ -69,8 +70,41 @@ export function startBackgroundMusic(): void {
   if (audio && !globalIsMuted) {
     audio.play().catch(err => {
       console.log('Music play prevented:', err)
+      // If autoplay fails, set up one-time click handler
+      if (!hasTriedAutoplay) {
+        hasTriedAutoplay = true
+        const tryPlay = () => {
+          if (audio && !globalIsMuted) {
+            audio.play().catch(console.log)
+          }
+          document.removeEventListener('click', tryPlay)
+          document.removeEventListener('keydown', tryPlay)
+        }
+        document.addEventListener('click', tryPlay, { once: true })
+        document.addEventListener('keydown', tryPlay, { once: true })
+      }
     })
   }
+}
+
+/**
+ * Initialize music on first user interaction
+ */
+export function initMusicOnInteraction(): void {
+  if (hasTriedAutoplay) return
+
+  hasTriedAutoplay = true
+  const audio = getGlobalAudio()
+
+  const tryPlay = () => {
+    if (audio && !globalIsMuted) {
+      audio.play().catch(console.log)
+    }
+  }
+
+  // Try to play on first click or keypress
+  document.addEventListener('click', tryPlay, { once: true })
+  document.addEventListener('keydown', tryPlay, { once: true })
 }
 
 /**
